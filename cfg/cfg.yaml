@@ -5,7 +5,7 @@ custom_reply:
       35: "D" # new order
     check_condition_body:
       40: "1" # Market
-    reply_flow:
+    default_reply_flow:
       - interval: -1 # Send accept execution report immediately
         reply:
           39: "0" # accept
@@ -54,7 +54,7 @@ custom_reply:
       35: "D" # new order
     check_condition_body:
       40: "2" # Limit
-    reply_flow:
+    default_reply_flow:
       - interval: 1000
         reply:
           39: "0" # accept
@@ -75,3 +75,6 @@ custom_reply:
           55: "InputField.55"
           60: "CallFunc.getTzDateTime"
           150: "2" # ExecType
+    symbols_reply_flow:
+      - symbols: []
+        reply_flow: []

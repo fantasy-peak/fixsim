@@ -2,7 +2,7 @@ set_project("fixsim")
 set_version("1.0.0", {build = "%Y%m%d%H%M"})
 set_xmakever("2.9.9")
 
-add_defines("VERSION=\"1.0.0\"")
+add_defines("NOT_USE_YCS_INIT_VALUE", "SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG")
 
 add_repositories("my_private_repo https://github.com/fantasy-peak/xmake-repo.git")
 

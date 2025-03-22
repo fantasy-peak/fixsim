@@ -51,7 +51,7 @@ std::string uuid() {
 }  // namespace
 
 void Application::onCreate(const FIX::SessionID &id) {
-    SPDLOG_INFO("onCreate: {}", id.toString());
+    SPDLOG_INFO("onCreate: [{}]", id.toString());
 }
 
 void Application::onLogon(const FIX::SessionID &id) {
@@ -62,12 +62,11 @@ void Application::onLogout(const FIX::SessionID &id) {
     SPDLOG_INFO("onLogout: [{}]", id.toString());
 }
 
-void Application::toAdmin(FIX::Message &message, const FIX::SessionID &id) {}
+void Application::toAdmin(FIX::Message &, const FIX::SessionID &) {}
 
-void Application::toApp(FIX::Message &message, const FIX::SessionID &id) {}
+void Application::toApp(FIX::Message &, const FIX::SessionID &) {}
 
-void Application::fromAdmin(const FIX::Message &message,
-                            const FIX::SessionID &id) {}
+void Application::fromAdmin(const FIX::Message &, const FIX::SessionID &) {}
 
 void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
     try {
@@ -77,8 +76,9 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
         } catch (const std::exception &e) {
             SPDLOG_ERROR("get FIX::FIELD::Symbol error: {}", e.what());
         }
-        for (const auto &[check_cond_header, check_cond_body, reply_flow,
-                          symbols_reply_flow] : m_cfg.custom_reply) {
+        for (const auto &[check_cond_header, check_cond_body,
+                          default_reply_flow, symbols_reply_flow] :
+             m_cfg.custom_reply) {
             const auto &hdr = msg.getHeader();
             const auto &body = msg;
 
@@ -98,23 +98,25 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
             if (!body_match)
                 continue;
 
-            // for (auto [k, v] : check_cond_body)
-            //     SPDLOG_INFO("{}-{}", k, v);
             auto msg_ptr = std::make_shared<FIX::Message>(msg);
-            asio::post(*m_io_ctx, [id, this, &reply_flow, &symbols_reply_flow,
+            asio::post(*m_io_ctx, [id, this, &default_reply_flow,
+                                   &symbols_reply_flow,
                                    symbol = std::move(symbol),
                                    msg_ptr = std::move(msg_ptr)]() mutable {
-                for (const auto &flow : symbols_reply_flow) {
-                    auto it = std::ranges::find_if(
-                        flow.symbols,
-                        [&](const auto &p) { return p == symbol; });
-                    if (it != flow.symbols.end() && !flow.reply_flow.empty()) {
-                        addTimed(id, flow.reply_flow, msg_ptr);
-                        return;
-                    }
+                if (auto it = std::ranges::find_if(
+                        symbols_reply_flow,
+                        [&](const auto &flow) {
+                            return std::ranges::find(flow.symbols, symbol) !=
+                                       flow.symbols.end() &&
+                                   !flow.reply_flow.empty();
+                        });
+                    it != symbols_reply_flow.end()) {
+                    addTimedTask(id, it->reply_flow, msg_ptr);
+                } else {
+                    addTimedTask(id, default_reply_flow, msg_ptr);
                 }
-                addTimed(id, reply_flow, msg_ptr);
             });
+
             return;
         }
     } catch (const std::exception &e) {
@@ -122,22 +124,21 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
     }
 }
 
-void Application::addTimed(const FIX::SessionID &id,
-                           const std::vector<ReplyData> &reply_flow,
-                           const std::shared_ptr<FIX::Message> &msg_ptr) {
+void Application::addTimedTask(const FIX::SessionID &id,
+                               const std::vector<ReplyData> &reply_flow,
+                               const std::shared_ptr<FIX::Message> &msg_ptr) {
     for (auto &[reply, interval] : reply_flow) {
         if (interval <= 0) {
             send(id, reply, *msg_ptr);
         } else {
             auto expiry = std::chrono::system_clock::now() +
-                          std::chrono::milliseconds(interval);
+                          std::chrono::milliseconds{interval};
             m_timed.emplace(expiry, std::make_tuple(id, reply, msg_ptr));
         }
     }
 }
 
-void Application::send(const FIX::SessionID &id,
-                       const std::unordered_map<int32_t, std::string> &reply,
+void Application::send(const FIX::SessionID &id, const FixFieldMap &reply,
                        const FIX::Message &msg) {
     try {
         FIX42::ExecutionReport execution_report;

@@ -20,8 +20,10 @@
 #include <nlohmann/json.hpp>
 #include <yaml_cpp_struct.hpp>
 
+using FixFieldMap = std::unordered_map<int32_t, std::string>;
+
 struct ReplyData {
-    std::unordered_map<int32_t, std::string> reply;
+    FixFieldMap reply;
     int32_t interval;
 };
 YCS_ADD_STRUCT(ReplyData, reply, interval)
@@ -33,13 +35,13 @@ struct SymbolsReplyData {
 YCS_ADD_STRUCT(SymbolsReplyData, symbols, reply_flow)
 
 struct Reply {
-    std::unordered_map<int32_t, std::string> check_condition_header;
-    std::unordered_map<int32_t, std::string> check_condition_body;
-    std::vector<ReplyData> reply_flow;
+    FixFieldMap check_condition_header;
+    FixFieldMap check_condition_body;
+    std::vector<ReplyData> default_reply_flow;
     std::vector<SymbolsReplyData> symbols_reply_flow;
 };
-YCS_ADD_STRUCT(Reply, check_condition_header, check_condition_body, reply_flow,
-               symbols_reply_flow)
+YCS_ADD_STRUCT(Reply, check_condition_header, check_condition_body,
+               default_reply_flow, symbols_reply_flow)
 
 struct Config {
     int32_t interval;
@@ -66,10 +68,9 @@ public:
     void parseXml(const std::string &);
 
 private:
-    void addTimed(const FIX::SessionID &, const std::vector<ReplyData> &,
+    void addTimedTask(const FIX::SessionID &, const std::vector<ReplyData> &,
                   const std::shared_ptr<FIX::Message> &);
-    void send(const FIX::SessionID &,
-              const std::unordered_map<int32_t, std::string> &,
+    void send(const FIX::SessionID &, const FixFieldMap &,
               const FIX::Message &);
     asio::awaitable<void> loopTimer();
 
@@ -78,8 +79,7 @@ private:
 
     std::multimap<
         std::chrono::system_clock::time_point,
-        std::tuple<FIX::SessionID, std::unordered_map<int32_t, std::string>,
-                   std::shared_ptr<FIX::Message>>>
+        std::tuple<FIX::SessionID, FixFieldMap, std::shared_ptr<FIX::Message>>>
         m_timed;
     nlohmann::json m_tag_list;
     std::unordered_map<std::string, int32_t> m_tag_mapping;
