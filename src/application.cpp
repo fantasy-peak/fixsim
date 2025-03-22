@@ -1,15 +1,18 @@
 #include <algorithm>
+#include <atomic>
 #include <chrono>
-#include <fstream>
+#include <cstdint>
 #include <memory>
 #include <ranges>
 #include <string>
+#include <string_view>
 #include <tuple>
 
 #include <quickfix/Message.h>
 #include <quickfix/Session.h>
 #include <quickfix/fix42/ExecutionReport.h>
 
+#include <httplib.h>
 #include <spdlog/spdlog.h>
 #include <uuid/uuid.h>
 #include <asio/as_tuple.hpp>
@@ -20,13 +23,18 @@
 
 namespace {
 
-auto split(const std::string &value) {
-    return value | std::views::split('.') |
-           std::views::transform([](auto &&rng) {
-               return std::string(&*rng.begin(), std::ranges::distance(
-                                                     rng.begin(), rng.end()));
-           }) |
-           std::ranges::to<std::vector<std::string>>();
+std::string getValue(const std::string &value) {
+    auto ret =
+        value | std::views::split('.') | std::views::transform([](auto &&rng) {
+            return std::string_view(
+                &*rng.begin(), std::ranges::distance(rng.begin(), rng.end()));
+        }) |
+        std::ranges::to<std::vector<std::string_view>>();
+    if (ret.size() != 2) {
+        SPDLOG_ERROR("invalid: {}", value);
+        exit(1);
+    }
+    return std::string{ret[1]};
 }
 
 std::string getTzDateTime() {
@@ -46,6 +54,17 @@ std::string uuid() {
     std::string value(uuid_str);
     std::ranges::replace(value, '-', '.');
     return value;
+}
+
+std::string randomNumber(int min = 1000, int max = 9999) {
+    thread_local std::mt19937 gen(std::random_device{}());
+    std::uniform_int_distribution<> dist(min, max);
+    return std::to_string(dist(gen));
+}
+
+std::string increment() {
+    static std::atomic_uint64_t init_value = 1;
+    return std::to_string(init_value.fetch_add(1, std::memory_order::relaxed));
 }
 
 }  // namespace
@@ -144,22 +163,23 @@ void Application::send(const FIX::SessionID &id, const FixFieldMap &reply,
         FIX42::ExecutionReport execution_report;
         for (const auto &[field, value] : reply) {
             if (value.starts_with("InputField.")) {
-                auto vec = split(value);
-                execution_report.setField(field,
-                                          msg.getField(std::stoul(vec.at(1))));
+                auto val = getValue(value);
+                execution_report.setField(field, msg.getField(std::stoul(val)));
                 continue;
             }
             if (value.starts_with("CallFunc.")) {
-                auto vec = split(value);
-                const auto &func_name = vec[1];
-                if (func_name == "uuid")
+                auto func_name = getValue(value);
+                if (func_name == "uuid") {
                     execution_report.setField(field, uuid());
-                else if (func_name == "getTzDateTime") {
+                } else if (func_name == "getTzDateTime") {
                     execution_report.setField(field, getTzDateTime());
+                } else if (func_name == "randomNumber") {
+                    execution_report.setField(field, randomNumber());
+                } else if (func_name == "increment") {
+                    execution_report.setField(field, increment());
                 } else {
                     SPDLOG_ERROR("Unrecognized: {}", value);
                 }
-                continue;
             }
             execution_report.setField(field, value);
         }
@@ -219,12 +239,6 @@ void Application::parseXml(const std::string &xml) {
             }
         }
         m_interface_mapping[interface_name] = json;
-        std::ofstream out("interface.txt", std::ios::app);
-        if (!out) {
-            SPDLOG_ERROR("can't open ./interface.txt");
-            return;
-        }
-        out << json.dump(2) << "\n";
     };
     parse_interface("NewOrderSingle");
     parse_interface("OrderCancelReplaceRequest");
@@ -232,4 +246,38 @@ void Application::parseXml(const std::string &xml) {
     parse_interface("ExecutionReport");
     parse_interface("OrderCancelReject");
     parse_interface("BusinessMessageReject");
+}
+
+void Application::startHttpServer() {
+    auto http_server = std::make_shared<httplib::Server>();
+    auto route = [&](const std::string &path) {
+        http_server->Get(
+            std::format("/{}", path),
+            [this, path](const httplib::Request &, httplib::Response &res) {
+                res.set_content(m_interface_mapping[path].dump(),
+                                "application/json");
+            });
+    };
+    http_server->Get("/tag_list",
+                     [this](const httplib::Request &, httplib::Response &res) {
+                         res.set_content(m_tag_list.dump(), "application/json");
+                     });
+    route("NewOrderSingle");
+    route("OrderCancelReplaceRequest");
+    route("OrderCancelRequest");
+    route("ExecutionReport");
+    route("OrderCancelReject");
+    route("BusinessMessageReject");
+    m_thread = std::thread([http_server, this] {
+        SPDLOG_INFO("start http server at {}:{}", m_cfg.http_server_host,
+                    m_cfg.http_server_port);
+        http_server->listen(m_cfg.http_server_host, m_cfg.http_server_port);
+    });
+    m_stop = [http_server] { http_server->stop(); };
+}
+
+void Application::stopHttpServer() {
+    m_stop();
+    if (m_thread.joinable())
+        m_thread.join();
 }

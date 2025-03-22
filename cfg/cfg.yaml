@@ -1,3 +1,5 @@
+http_server_host: "0.0.0.0"
+http_server_port: 2025
 interval: 100
 fix_ini: ./cfg/fix.ini
 custom_reply:

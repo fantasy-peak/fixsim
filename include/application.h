@@ -2,8 +2,10 @@
 #define _APPLICATION_H_
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
+#include <thread>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
@@ -44,11 +46,14 @@ YCS_ADD_STRUCT(Reply, check_condition_header, check_condition_body,
                default_reply_flow, symbols_reply_flow)
 
 struct Config {
+    std::string http_server_host;
+    uint16_t http_server_port;
     int32_t interval;
     std::string fix_ini;
     std::vector<Reply> custom_reply;
 };
-YCS_ADD_STRUCT(Config, interval, fix_ini, custom_reply)
+YCS_ADD_STRUCT(Config, http_server_host, http_server_port, interval, fix_ini,
+               custom_reply)
 
 class Application : public FIX::Application {
 public:
@@ -66,10 +71,12 @@ public:
     void fromApp(const FIX::Message &, const FIX::SessionID &) override;
 
     void parseXml(const std::string &);
+    void startHttpServer();
+    void stopHttpServer();
 
 private:
     void addTimedTask(const FIX::SessionID &, const std::vector<ReplyData> &,
-                  const std::shared_ptr<FIX::Message> &);
+                      const std::shared_ptr<FIX::Message> &);
     void send(const FIX::SessionID &, const FixFieldMap &,
               const FIX::Message &);
     asio::awaitable<void> loopTimer();
@@ -81,6 +88,10 @@ private:
         std::chrono::system_clock::time_point,
         std::tuple<FIX::SessionID, FixFieldMap, std::shared_ptr<FIX::Message>>>
         m_timed;
+
+    std::thread m_thread;
+    std::function<void()> m_stop = [] {};
+
     nlohmann::json m_tag_list;
     std::unordered_map<std::string, int32_t> m_tag_mapping;
     std::unordered_map<std::string, nlohmann::json> m_interface_mapping;

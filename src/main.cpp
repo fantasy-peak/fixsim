@@ -32,6 +32,7 @@ int main(int argc, char **argv) {
 
         Application application(io_context, cfg.value());
         application.parseXml(dict_file);
+        application.startHttpServer();
 
         FIX::FileStoreFactory store_factory(settings);
         FIX::FileLogFactory log_factory(settings);
@@ -41,6 +42,7 @@ int main(int argc, char **argv) {
         acceptor->start();
 
         sig.async_wait([&](const asio::error_code &, int) {
+            application.stopHttpServer();
             acceptor->stop();
             io_context->stop();
         });
