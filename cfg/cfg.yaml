@@ -1,0 +1,77 @@
+interval: 100
+fix_ini: ./cfg/fix.ini
+custom_reply:
+  - check_condition_header:
+      35: "D" # new order
+    check_condition_body:
+      40: "1" # Market
+    reply_flow:
+      - interval: -1 # Send accept execution report immediately
+        reply:
+          39: "0" # accept
+          37: "InputField.11"
+          17: "CallFunc.uuid"
+          20: "0"
+          54: "InputField.54"
+          55: "InputField.55"
+          60: "CallFunc.getTzDateTime"
+          150: "0" # ExecType
+      - interval: 5000 # Send fill execution report after 5000 milliseconds
+        reply:
+          39: "2" # fill
+          37: "InputField.11"
+          17: "CallFunc.uuid"
+          20: "1"
+          54: "InputField.54"
+          55: "InputField.55"
+          60: "CallFunc.getTzDateTime"
+          150: "2" # ExecType
+    symbols_reply_flow:
+      - symbols: ["USDJPY"] # if  InputField.symbol in symbols, It uses the following reply_flow
+        reply_flow:
+          - interval: -1
+            reply:
+              39: "8" # accept
+              37: "InputField.11"
+              17: "CallFunc.uuid"
+              20: "0"
+              54: "InputField.54"
+              55: "InputField.55"
+              60: "CallFunc.getTzDateTime"
+              150: "0" # ExecType
+          - interval: 5000
+            reply:
+              39: "9" # fill
+              37: "InputField.11"
+              17: "CallFunc.uuid"
+              20: "1"
+              54: "InputField.54"
+              55: "InputField.55"
+              60: "CallFunc.getTzDateTime"
+              150: "2" # ExecType
+
+  - check_condition_header:
+      35: "D" # new order
+    check_condition_body:
+      40: "2" # Limit
+    reply_flow:
+      - interval: 1000
+        reply:
+          39: "0" # accept
+          37: "InputField.11"
+          17: "CallFunc.uuid"
+          20: "0"
+          54: "InputField.54"
+          55: "InputField.55"
+          60: "CallFunc.getTzDateTime"
+          150: "0" # ExecType
+      - interval: 5000
+        reply:
+          39: "2" # fill
+          37: "InputField.11"
+          17: "CallFunc.uuid"
+          20: "1"
+          54: "InputField.54"
+          55: "InputField.55"
+          60: "CallFunc.getTzDateTime"
+          150: "2" # ExecType
