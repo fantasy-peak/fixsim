@@ -3,6 +3,7 @@ http_server_port: 2025
 interval: 100
 fix_ini: ./cfg/fix.ini
 fix_version: "FIX42"
+stress_interval: 100000
 
 custom_reply:
   - check_condition_header:

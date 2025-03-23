@@ -2,6 +2,7 @@
 #define _APPLICATION_H_
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -21,6 +22,7 @@
 #include <quickfix/Values.h>
 
 #include <asio.hpp>
+#include <asio/thread_pool.hpp>
 #include <nlohmann/json.hpp>
 #include <yaml_cpp_struct.hpp>
 
@@ -63,10 +65,11 @@ struct Config {
     uint16_t http_server_port;
     int32_t interval;
     std::string fix_ini;
+    std::chrono::microseconds stress_interval;
     std::vector<Reply> custom_reply;
 };
 YCS_ADD_STRUCT(Config, fix_version, http_server_host, http_server_port,
-               interval, fix_ini, custom_reply)
+               interval, fix_ini, stress_interval, custom_reply)
 
 class Application : public FIX::Application {
 public:
@@ -94,9 +97,12 @@ private:
     void send(const FIX::SessionID &, const FixFieldMap &,
               const FIX::Message &);
     asio::awaitable<void> loopTimer();
+    asio::awaitable<void> startStress(std::vector<std::string>);
 
     std::shared_ptr<asio::io_context> m_io_ctx;
     Config m_cfg;
+    asio::thread_pool m_pool{1};
+    FIX::Session *m_session{nullptr};
 
     std::multimap<
         std::chrono::system_clock::time_point,
@@ -110,6 +116,7 @@ private:
     std::unordered_map<std::string, int32_t> m_tag_mapping;
     std::unordered_map<std::string, nlohmann::json> m_interface_mapping;
     std::atomic_bool m_pause{false};
+    std::atomic_bool m_close_stress{false};
 };
 
 #endif

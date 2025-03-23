@@ -23,10 +23,20 @@
 #include <asio/as_tuple.hpp>
 #include <asio/post.hpp>
 #include <pugixml.hpp>
+#include <unordered_map>
 
 #include "application.h"
 
 namespace {
+
+auto spilt(const std::string &line, char flag) {
+    return line | std::views::split(flag) |
+           std::views::transform([](auto &&rng) {
+               return std::string(&*rng.begin(), std::ranges::distance(
+                                                     rng.begin(), rng.end()));
+           }) |
+           std::ranges::to<std::vector<std::string>>();
+}
 
 std::string getValue(const std::string &value) {
     auto ret =
@@ -76,6 +86,8 @@ std::string increment() {
 
 void Application::onCreate(const FIX::SessionID &id) {
     SPDLOG_INFO("onCreate: [{}]", id.toString());
+    asio::post(m_pool,
+               [this, id] { m_session = FIX::Session::lookupSession(id); });
 }
 
 void Application::onLogon(const FIX::SessionID &id) {
@@ -308,6 +320,28 @@ void Application::startHttpServer() {
             }
             res.set_content("success!\n", "text/plain");
         });
+    http_server->Post(
+        "/stress", [this](const httplib::Request &req, httplib::Response &res) {
+            try {
+                auto stress_data = spilt(req.body, '\n');
+                SPDLOG_INFO("csv size: {}", stress_data.size());
+                m_close_stress.store(false);
+                asio::co_spawn(*m_io_ctx, startStress(std::move(stress_data)),
+                               asio::detached);
+            } catch (const std::exception &e) {
+                SPDLOG_ERROR("{}", e.what());
+                res.status = 400;
+                res.set_content("invalid request", "text/plain");
+                return;
+            }
+            res.set_content("success!\n", "text/plain");
+        });
+    http_server->Get("/close/stress", [this](const httplib::Request &,
+                                             httplib::Response &res) {
+        m_close_stress.store(true);
+        SPDLOG_INFO("close stress: {}", m_close_stress ? "true" : "false");
+        res.set_content("success!\n", "text/plain");
+    });
     m_thread = std::thread([http_server, this] {
         SPDLOG_INFO("start http server at {}:{}", m_cfg.http_server_host,
                     m_cfg.http_server_port);
@@ -320,4 +354,53 @@ void Application::stopHttpServer() {
     m_stop();
     if (m_thread.joinable())
         m_thread.join();
+    m_pool.stop();
+    m_pool.join();
+}
+
+asio::awaitable<void> Application::startStress(std::vector<std::string> csv) {
+    if (csv.empty())
+        co_return;
+    asio::steady_timer timer(m_pool);
+    uint64_t count = 0;
+    std::vector<std::unordered_map<int32_t, std::string>> vec_fix_fields;
+    for (const auto &line : csv) {
+        std::unordered_map<int32_t, std::string> fix_fields;
+        auto vec = spilt(line, ',');
+        for (const auto &str : vec) {
+            auto pair = spilt(str, '=');
+            if (pair.size() != 2) {
+                continue;
+            }
+            fix_fields.emplace(std::stoi(pair.at(0)), pair.at(1));
+        }
+        vec_fix_fields.emplace_back(std::move(fix_fields));
+    }
+    for (;;) {
+        timer.expires_after(m_cfg.stress_interval);
+        auto [ec] =
+            co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
+        if (ec)
+            break;
+        if (m_close_stress.load(std::memory_order::relaxed)) {
+            break;
+        }
+        for (const auto &fix_fields : vec_fix_fields) {
+            auto exec_report = createExecutionReport();
+            exec_report->setField(60, getTzDateTime());
+            for (auto &[tag, value] : fix_fields) {
+                if (tag == 17)
+                    exec_report->setField(tag, std::to_string(count++));
+                else
+                    exec_report->setField(tag, value);
+            }
+            try {
+                if (m_session)
+                    m_session->send(*exec_report);
+            } catch (const std::exception &e) {
+                SPDLOG_ERROR("{}", e.what());
+            }
+        }
+    }
+    co_return;
 }
