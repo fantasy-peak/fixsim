@@ -73,10 +73,7 @@ YCS_ADD_STRUCT(Config, fix_version, http_server_host, http_server_port,
 
 class Application : public FIX::Application {
 public:
-    Application(std::shared_ptr<asio::io_context> ctx, const Config &cfg)
-        : m_io_ctx(std::move(ctx)), m_cfg(cfg) {
-        asio::co_spawn(*m_io_ctx, loopTimer(), asio::detached);
-    }
+    Application(std::shared_ptr<asio::io_context>, const Config &);
 
     void onCreate(const FIX::SessionID &) override;
     void onLogon(const FIX::SessionID &) override;

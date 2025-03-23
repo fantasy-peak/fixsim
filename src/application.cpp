@@ -27,6 +27,26 @@
 
 #include "application.h"
 
+namespace detail {
+
+template <typename C>
+struct to_helper {};
+
+template <typename Container, std::ranges::range R>
+    requires std::convertible_to<std::ranges::range_value_t<R>,
+                                 typename Container::value_type>
+Container operator|(R &&r, to_helper<Container>) {
+    return Container{r.begin(), r.end()};
+}
+
+}  // namespace detail
+
+template <std::ranges::range Container>
+    requires(!std::ranges::view<Container>)
+inline auto to() {
+    return detail::to_helper<Container>{};
+}
+
 namespace {
 
 auto spilt(const std::string &line, char flag) {
@@ -35,7 +55,7 @@ auto spilt(const std::string &line, char flag) {
                return std::string(&*rng.begin(), std::ranges::distance(
                                                      rng.begin(), rng.end()));
            }) |
-           std::ranges::to<std::vector<std::string>>();
+           to<std::vector<std::string>>();
 }
 
 std::string getValue(const std::string &value) {
@@ -44,7 +64,7 @@ std::string getValue(const std::string &value) {
             return std::string_view(
                 &*rng.begin(), std::ranges::distance(rng.begin(), rng.end()));
         }) |
-        std::ranges::to<std::vector<std::string_view>>();
+        to<std::vector<std::string_view>>();
     if (ret.size() != 2) {
         SPDLOG_ERROR("invalid: {}", value);
         exit(1);
@@ -83,6 +103,12 @@ std::string increment() {
 }
 
 }  // namespace
+
+Application::Application(std::shared_ptr<asio::io_context> ctx,
+                         const Config &cfg)
+    : m_io_ctx(std::move(ctx)), m_cfg(cfg) {
+    asio::co_spawn(*m_io_ctx, loopTimer(), asio::detached);
+}
 
 void Application::onCreate(const FIX::SessionID &id) {
     SPDLOG_INFO("onCreate: [{}]", id.toString());
