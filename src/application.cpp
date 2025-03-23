@@ -219,6 +219,9 @@ asio::awaitable<void> Application::loopTimer() {
             co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
         if (ec)
             break;
+        if (m_pause.load(std::memory_order::relaxed)) {
+            continue;
+        }
         const auto now = std::chrono::system_clock::now();
         while (!m_timed.empty() && m_timed.begin()->first <= now) {
             auto data = std::move(m_timed.begin()->second);
@@ -280,16 +283,31 @@ void Application::startHttpServer() {
                                 "application/json");
             });
     };
-    http_server->Get("/tag_list",
-                     [this](const httplib::Request &, httplib::Response &res) {
-                         res.set_content(m_tag_list.dump(), "application/json");
-                     });
     route("NewOrderSingle");
     route("OrderCancelReplaceRequest");
     route("OrderCancelRequest");
     route("ExecutionReport");
     route("OrderCancelReject");
     route("BusinessMessageReject");
+    http_server->Get("/tag_list",
+                     [this](const httplib::Request &, httplib::Response &res) {
+                         res.set_content(m_tag_list.dump(), "application/json");
+                     });
+    // curl -X POST http://127.0.0.1:2025/pause -d '{"flag": true }'
+    http_server->Post(
+        "/pause", [this](const httplib::Request &req, httplib::Response &res) {
+            try {
+                auto j = nlohmann::json::parse(req.body);
+                m_pause.store(j.at("flag").get<bool>());
+                SPDLOG_INFO("pause: {}", m_pause ? "true" : "false");
+            } catch (const std::exception &e) {
+                SPDLOG_ERROR("{}", e.what());
+                res.status = 400;
+                res.set_content("invalid request", "text/plain");
+                return;
+            }
+            res.set_content("success!\n", "text/plain");
+        });
     m_thread = std::thread([http_server, this] {
         SPDLOG_INFO("start http server at {}:{}", m_cfg.http_server_host,
                     m_cfg.http_server_port);

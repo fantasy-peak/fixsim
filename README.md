@@ -17,6 +17,16 @@ curl http://127.0.0.1:2025/OrderCancelReject | jq
 curl http://127.0.0.1:2025/BusinessMessageReject | jq
 ```
 
+## Control message sending
+### 1. Pause send message
+```
+curl -X POST http://127.0.0.1:2025/pause -d '{"flag": true }' -v
+```
+### 2. Lift the pause
+```
+curl -X POST http://127.0.0.1:2025/pause -d '{"flag": false }' -v
+```
+
 ## How to write configuration files
 ### 1. Query new order format
 ```
@@ -63,3 +73,4 @@ curl http://127.0.0.1:2025/BusinessMessageReject | jq
 
 ### 3. Write configuration file
 [cfg.yaml](https://github.com/fantasy-peak/fixsim/blob/main/cfg/cfg.yaml)
+

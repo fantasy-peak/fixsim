@@ -1,6 +1,7 @@
 #ifndef _APPLICATION_H_
 #define _APPLICATION_H_
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -108,6 +109,7 @@ private:
     nlohmann::json m_tag_list;
     std::unordered_map<std::string, int32_t> m_tag_mapping;
     std::unordered_map<std::string, nlohmann::json> m_interface_mapping;
+    std::atomic_bool m_pause{false};
 };
 
 #endif
