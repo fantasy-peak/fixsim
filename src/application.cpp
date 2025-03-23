@@ -10,7 +10,12 @@
 
 #include <quickfix/Message.h>
 #include <quickfix/Session.h>
+#include <quickfix/fix40/ExecutionReport.h>
+#include <quickfix/fix41/ExecutionReport.h>
 #include <quickfix/fix42/ExecutionReport.h>
+#include <quickfix/fix43/ExecutionReport.h>
+#include <quickfix/fix44/ExecutionReport.h>
+#include <quickfix/fix50/ExecutionReport.h>
 
 #include <httplib.h>
 #include <spdlog/spdlog.h>
@@ -157,33 +162,50 @@ void Application::addTimedTask(const FIX::SessionID &id,
     }
 }
 
+std::shared_ptr<FIX::Message> Application::createExecutionReport() {
+    switch (m_cfg.fix_version) {
+        case FixVersion::FIX40:
+            return std::make_shared<FIX40::ExecutionReport>();
+        case FixVersion::FIX41:
+            return std::make_shared<FIX41::ExecutionReport>();
+        case FixVersion::FIX42:
+            return std::make_shared<FIX42::ExecutionReport>();
+        case FixVersion::FIX43:
+            return std::make_shared<FIX43::ExecutionReport>();
+        case FixVersion::FIX44:
+            return std::make_shared<FIX44::ExecutionReport>();
+        case FixVersion::FIX50:
+            return std::make_shared<FIX50::ExecutionReport>();
+    }
+    throw std::runtime_error("Unsupported FIX version");
+}
+
 void Application::send(const FIX::SessionID &id, const FixFieldMap &reply,
                        const FIX::Message &msg) {
     try {
-        FIX42::ExecutionReport execution_report;
+        auto exec_report = createExecutionReport();
         for (const auto &[field, value] : reply) {
-            if (value.starts_with("InputField.")) {
+            if (value.starts_with("input.")) {
                 auto val = getValue(value);
-                execution_report.setField(field, msg.getField(std::stoul(val)));
-                continue;
-            }
-            if (value.starts_with("CallFunc.")) {
+                exec_report->setField(field, msg.getField(std::stoi(val)));
+            } else if (value.starts_with("call.")) {
                 auto func_name = getValue(value);
                 if (func_name == "uuid") {
-                    execution_report.setField(field, uuid());
+                    exec_report->setField(field, uuid());
                 } else if (func_name == "getTzDateTime") {
-                    execution_report.setField(field, getTzDateTime());
+                    exec_report->setField(field, getTzDateTime());
                 } else if (func_name == "randomNumber") {
-                    execution_report.setField(field, randomNumber());
+                    exec_report->setField(field, randomNumber());
                 } else if (func_name == "increment") {
-                    execution_report.setField(field, increment());
+                    exec_report->setField(field, increment());
                 } else {
                     SPDLOG_ERROR("Unrecognized: {}", value);
                 }
+            } else {
+                exec_report->setField(field, value);
             }
-            execution_report.setField(field, value);
         }
-        FIX::Session::sendToTarget(execution_report, id);
+        FIX::Session::sendToTarget(*exec_report, id);
     } catch (const std::exception &e) {
         SPDLOG_ERROR("{}", e.what());
     }

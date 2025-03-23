@@ -2,6 +2,8 @@ http_server_host: "0.0.0.0"
 http_server_port: 2025
 interval: 100
 fix_ini: ./cfg/fix.ini
+fix_version: "FIX42"
+
 custom_reply:
   - check_condition_header:
       35: "D" # new order
@@ -11,45 +13,45 @@ custom_reply:
       - interval: -1 # Send accept execution report immediately
         reply:
           39: "0" # accept
-          37: "InputField.11"
-          17: "CallFunc.uuid"
+          37: "input.11" # use new order's 11 field fill it(37)
+          17: "call.uuid"
           20: "0"
-          54: "InputField.54"
-          55: "InputField.55"
-          60: "CallFunc.getTzDateTime"
+          54: "input.54"
+          55: "input.55"
+          60: "call.getTzDateTime"
           150: "0" # ExecType
       - interval: 5000 # Send fill execution report after 5000 milliseconds
         reply:
           39: "2" # fill
-          37: "InputField.11"
-          17: "CallFunc.uuid"
+          37: "input.11"
+          17: "call.uuid"
           20: "1"
-          54: "InputField.54"
-          55: "InputField.55"
-          60: "CallFunc.getTzDateTime"
+          54: "input.54"
+          55: "input.55"
+          60: "call.getTzDateTime"
           150: "2" # ExecType
     symbols_reply_flow:
-      - symbols: ["USDJPY"] # if  InputField.symbol in symbols, It uses the following reply_flow
+      - symbols: ["USDJPY"] # if input.symbol in symbols, It uses the following reply_flow
         reply_flow:
           - interval: -1
             reply:
               39: "8" # accept
-              37: "InputField.11"
-              17: "CallFunc.uuid"
+              37: "input.11"
+              17: "call.uuid"
               20: "0"
-              54: "InputField.54"
-              55: "InputField.55"
-              60: "CallFunc.getTzDateTime"
+              54: "input.54"
+              55: "input.55"
+              60: "call.getTzDateTime"
               150: "0" # ExecType
           - interval: 5000
             reply:
               39: "9" # fill
-              37: "InputField.11"
-              17: "CallFunc.uuid"
+              37: "input.11"
+              17: "call.uuid"
               20: "1"
-              54: "InputField.54"
-              55: "InputField.55"
-              60: "CallFunc.getTzDateTime"
+              54: "input.54"
+              55: "input.55"
+              60: "call.getTzDateTime"
               150: "2" # ExecType
 
   - check_condition_header:
@@ -60,22 +62,22 @@ custom_reply:
       - interval: 1000
         reply:
           39: "0" # accept
-          37: "InputField.11"
-          17: "CallFunc.uuid"
+          37: "input.11"
+          17: "call.uuid"
           20: "0"
-          54: "InputField.54"
-          55: "InputField.55"
-          60: "CallFunc.getTzDateTime"
+          54: "input.54"
+          55: "input.55"
+          60: "call.getTzDateTime"
           150: "0" # ExecType
       - interval: 5000
         reply:
           39: "2" # fill
-          37: "InputField.11"
-          17: "CallFunc.uuid"
+          37: "input.11"
+          17: "call.uuid"
           20: "1"
-          54: "InputField.54"
-          55: "InputField.55"
-          60: "CallFunc.getTzDateTime"
+          54: "input.54"
+          55: "input.55"
+          60: "call.getTzDateTime"
           150: "2" # ExecType
     symbols_reply_flow:
       - symbols: []

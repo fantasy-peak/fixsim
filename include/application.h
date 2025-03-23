@@ -13,6 +13,7 @@
 
 #include <quickfix/Application.h>
 #include <quickfix/FieldNumbers.h>
+#include <quickfix/Message.h>
 #include <quickfix/MessageCracker.h>
 #include <quickfix/Mutex.h>
 #include <quickfix/Utility.h>
@@ -23,6 +24,16 @@
 #include <yaml_cpp_struct.hpp>
 
 using FixFieldMap = std::unordered_map<int32_t, std::string>;
+
+enum class FixVersion : uint8_t {
+    FIX40,
+    FIX41,
+    FIX42,
+    FIX43,
+    FIX44,
+    FIX50,
+};
+YCS_ADD_ENUM(FixVersion, FIX40, FIX41, FIX42, FIX43, FIX44, FIX50)
 
 struct ReplyData {
     FixFieldMap reply;
@@ -46,14 +57,15 @@ YCS_ADD_STRUCT(Reply, check_condition_header, check_condition_body,
                default_reply_flow, symbols_reply_flow)
 
 struct Config {
+    FixVersion fix_version;
     std::string http_server_host;
     uint16_t http_server_port;
     int32_t interval;
     std::string fix_ini;
     std::vector<Reply> custom_reply;
 };
-YCS_ADD_STRUCT(Config, http_server_host, http_server_port, interval, fix_ini,
-               custom_reply)
+YCS_ADD_STRUCT(Config, fix_version, http_server_host, http_server_port,
+               interval, fix_ini, custom_reply)
 
 class Application : public FIX::Application {
 public:
@@ -77,6 +89,7 @@ public:
 private:
     void addTimedTask(const FIX::SessionID &, const std::vector<ReplyData> &,
                       const std::shared_ptr<FIX::Message> &);
+    std::shared_ptr<FIX::Message> createExecutionReport();
     void send(const FIX::SessionID &, const FixFieldMap &,
               const FIX::Message &);
     asio::awaitable<void> loopTimer();
