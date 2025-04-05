@@ -281,8 +281,22 @@ void Application::parseXml(const std::string &xml) {
         std::string name = field.attribute("name").as_string();
         int number = field.attribute("number").as_int();
         std::string type = field.attribute("type").as_string();
-        m_tag_list[std::to_string(number)] = std::format("{} ({})", name, type);
-        m_tag_mapping[name] = number;
+        nlohmann::json json;
+        if (type == "CHAR") {
+            for (pugi::xml_node value : field.children("value")) {
+                std::string enum_val = value.attribute("enum").as_string();
+                std::string desc = value.attribute("description").as_string();
+                nlohmann::json enum_json;
+                enum_json["value"] = enum_val;
+                enum_json["description"] = desc;
+                json["enum"].emplace_back(enum_json);
+            }
+        }
+        m_tag_list[std::to_string(number)]["name"] = name;
+        m_tag_list[std::to_string(number)]["type"] = type;
+        json["tag"] = number;
+        json["type"] = type;
+        m_tag_mapping[name] = std::move(json);
     }
     auto parse_interface = [&](const std::string &interface_name) {
         nlohmann::json json;
@@ -296,9 +310,14 @@ void Application::parseXml(const std::string &xml) {
             json["Name"] = node.attribute("name").value();
             for (pugi::xml_node field : node.children("field")) {
                 auto name = field.attribute("name").value();
-                json["Field"][name] =
-                    std::format("tag({}) Required({})", m_tag_mapping[name],
-                                field.attribute("required").value());
+                auto &tag_json = m_tag_mapping[name];
+                json["Field"][name]["tag"] = tag_json["tag"];
+                json["Field"][name]["type"] = tag_json["type"];
+                json["Field"][name]["required"] =
+                    field.attribute("required").value();
+                if (tag_json.contains("enum")) {
+                    json["Field"][name]["enum"] = tag_json["enum"];
+                }
             }
         }
         m_interface_mapping[interface_name] = json;

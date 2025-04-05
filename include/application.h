@@ -110,7 +110,7 @@ private:
     std::function<void()> m_stop = [] {};
 
     nlohmann::json m_tag_list;
-    std::unordered_map<std::string, int32_t> m_tag_mapping;
+    std::unordered_map<std::string, nlohmann::json> m_tag_mapping;
     std::unordered_map<std::string, nlohmann::json> m_interface_mapping;
     std::atomic_bool m_pause{false};
     std::atomic_bool m_close_stress{false};
