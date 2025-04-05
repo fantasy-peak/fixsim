@@ -138,9 +138,8 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
         } catch (const std::exception &e) {
             SPDLOG_ERROR("get FIX::FIELD::Symbol error: {}", e.what());
         }
-        for (const auto &[check_cond_header, check_cond_body,
-                          default_reply_flow, symbols_reply_flow] :
-             m_cfg.custom_reply) {
+        for (auto &[check_cond_header, check_cond_body, default_reply_flow,
+                    symbols_reply_flow] : m_cfg.custom_reply) {
             const auto &hdr = msg.getHeader();
             const auto &body = msg;
 
@@ -187,7 +186,7 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
 }
 
 void Application::addTimedTask(const FIX::SessionID &id,
-                               const std::vector<ReplyData> &reply_flow,
+                               std::vector<ReplyData> &reply_flow,
                                const std::shared_ptr<FIX::Message> &msg_ptr) {
     for (auto &[reply, interval] : reply_flow) {
         if (interval <= 0) {
@@ -195,7 +194,8 @@ void Application::addTimedTask(const FIX::SessionID &id,
         } else {
             auto expiry = std::chrono::system_clock::now() +
                           std::chrono::milliseconds{interval};
-            m_timed.emplace(expiry, std::make_tuple(id, reply, msg_ptr));
+            m_timed.emplace(
+                expiry, TimedData{.id = id, .reply = &reply, .msg = msg_ptr});
         }
     }
 }
@@ -265,7 +265,7 @@ asio::awaitable<void> Application::loopTimer() {
             auto data = std::move(m_timed.begin()->second);
             m_timed.erase(m_timed.begin());
             auto &[id, reply, msg] = data;
-            send(id, reply, *msg);
+            send(id, *reply, *msg);
         }
     }
 }

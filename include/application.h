@@ -8,9 +8,7 @@
 #include <memory>
 #include <string>
 #include <thread>
-#include <tuple>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include <quickfix/Application.h>
@@ -88,7 +86,7 @@ public:
     void stopHttpServer();
 
 private:
-    void addTimedTask(const FIX::SessionID &, const std::vector<ReplyData> &,
+    void addTimedTask(const FIX::SessionID &, std::vector<ReplyData> &,
                       const std::shared_ptr<FIX::Message> &);
     std::shared_ptr<FIX::Message> createExecutionReport();
     void send(const FIX::SessionID &, const FixFieldMap &,
@@ -101,10 +99,12 @@ private:
     asio::thread_pool m_pool{1};
     FIX::Session *m_session{nullptr};
 
-    std::multimap<
-        std::chrono::system_clock::time_point,
-        std::tuple<FIX::SessionID, FixFieldMap, std::shared_ptr<FIX::Message>>>
-        m_timed;
+    struct TimedData {
+        FIX::SessionID id;
+        FixFieldMap *reply;
+        std::shared_ptr<FIX::Message> msg;
+    };
+    std::multimap<std::chrono::system_clock::time_point, TimedData> m_timed;
 
     std::thread m_thread;
     std::function<void()> m_stop = [] {};
