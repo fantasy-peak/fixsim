@@ -104,6 +104,7 @@ private:
         FixFieldMap *reply;
         std::shared_ptr<FIX::Message> msg;
     };
+
     std::multimap<std::chrono::system_clock::time_point, TimedData> m_timed;
 
     std::thread m_thread;

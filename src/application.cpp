@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <unordered_map>
 
 #include <quickfix/Message.h>
 #include <quickfix/Session.h>
@@ -23,7 +24,6 @@
 #include <asio/as_tuple.hpp>
 #include <asio/post.hpp>
 #include <pugixml.hpp>
-#include <unordered_map>
 
 #include "application.h"
 
@@ -148,6 +148,7 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
                     const auto &[field, expected] = cond;
                     return hdr.getField(field) == expected;
                 });
+
             if (!header_match)
                 continue;
 
@@ -156,6 +157,7 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
                     const auto &[field, expected] = cond;
                     return body.getField(field) == expected;
                 });
+
             if (!body_match)
                 continue;
 
@@ -180,6 +182,7 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
 
             return;
         }
+        SPDLOG_ERROR("Configuration not matched: [{}]", msg.toString());
     } catch (const std::exception &e) {
         SPDLOG_ERROR("{}", e.what());
     }
@@ -188,12 +191,13 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
 void Application::addTimedTask(const FIX::SessionID &id,
                                std::vector<ReplyData> &reply_flow,
                                const std::shared_ptr<FIX::Message> &msg_ptr) {
+    std::chrono::milliseconds dut{0};
     for (auto &[reply, interval] : reply_flow) {
         if (interval <= 0) {
             send(id, reply, *msg_ptr);
         } else {
-            auto expiry = std::chrono::system_clock::now() +
-                          std::chrono::milliseconds{interval};
+            dut += std::chrono::milliseconds{interval};
+            auto expiry = std::chrono::system_clock::now() + dut;
             m_timed.emplace(
                 expiry, TimedData{.id = id, .reply = &reply, .msg = msg_ptr});
         }
