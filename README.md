@@ -6,6 +6,18 @@ Overview
 fixsim is an project for FIX protocol server implementations. It can set the response format you want through the configuration file
 It can be used for testing your client.
 
+## Quick Start :rocket:
+* need install xmake, >= gcc version 13.1.0 (GCC)
+
+#### Compile fixsim
+```
+curl -fsSL https://xmake.io/shget.text | bash
+git clone https://github.com/fantasy-peak/fixsim.git
+cd fixsim
+xmake build -v -y
+xmake install -o .
+```
+
 ## Query interface parameters
 ```
 curl http://127.0.0.1:2025/tag_list | jq
