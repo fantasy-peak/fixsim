@@ -18,6 +18,13 @@
 #include <quickfix/fix44/ExecutionReport.h>
 #include <quickfix/fix50/ExecutionReport.h>
 
+#include <quickfix/fix40/OrderCancelReject.h>
+#include <quickfix/fix41/OrderCancelReject.h>
+#include <quickfix/fix42/OrderCancelReject.h>
+#include <quickfix/fix43/OrderCancelReject.h>
+#include <quickfix/fix44/OrderCancelReject.h>
+#include <quickfix/fix50/OrderCancelReject.h>
+
 #include <httplib.h>
 #include <spdlog/spdlog.h>
 #include <uuid/uuid.h>
@@ -191,19 +198,21 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
 
 void Application::addTimedTask(const FIX::SessionID &id,
                                std::vector<ReplyData> &reply_flow,
-                               FixFieldMap &common,
+                               FixFieldMap &common_fix_fields,
                                const std::shared_ptr<FIX::Message> &msg_ptr) {
     std::chrono::milliseconds dut{0};
-    for (auto &[reply, interval] : reply_flow) {
+    for (auto &[fix_fields, interval, msg_type] : reply_flow) {
         if (interval <= 0) {
-            send(id, reply, common, *msg_ptr);
+            send(id, fix_fields, common_fix_fields, *msg_ptr, msg_type);
         } else {
             dut += std::chrono::milliseconds{interval};
             auto expiry = std::chrono::system_clock::now() + dut;
-            m_timed.emplace(expiry, TimedData{.id = id,
-                                              .reply = &reply,
-                                              .common_reply = &common,
-                                              .msg = msg_ptr});
+            m_timed.emplace(expiry,
+                            TimedData{.id = id,
+                                      .fix_fields = &fix_fields,
+                                      .common_fix_fields = &common_fix_fields,
+                                      .msg = msg_ptr,
+                                      .msg_type = msg_type});
         }
     }
 }
@@ -226,39 +235,61 @@ std::shared_ptr<FIX::Message> Application::createExecutionReport() {
     throw std::runtime_error("Unsupported FIX version");
 }
 
-void Application::send(const FIX::SessionID &id, const FixFieldMap &reply,
-                       const FixFieldMap &common_fields,
-                       const FIX::Message &msg) {
+std::shared_ptr<FIX::Message> Application::createOrderCancelReject() {
+    switch (m_cfg.fix_version) {
+        case FixVersion::FIX40:
+            return std::make_shared<FIX40::OrderCancelReject>();
+        case FixVersion::FIX41:
+            return std::make_shared<FIX41::OrderCancelReject>();
+        case FixVersion::FIX42:
+            return std::make_shared<FIX42::OrderCancelReject>();
+        case FixVersion::FIX43:
+            return std::make_shared<FIX43::OrderCancelReject>();
+        case FixVersion::FIX44:
+            return std::make_shared<FIX44::OrderCancelReject>();
+        case FixVersion::FIX50:
+            return std::make_shared<FIX50::OrderCancelReject>();
+    }
+    throw std::runtime_error("Unsupported FIX version");
+}
+
+void Application::send(const FIX::SessionID &id, const FixFieldMap &fix_fields,
+                       const FixFieldMap &common_fix_fields,
+                       const FIX::Message &msg, MsgType msg_type) {
     try {
-        auto exec_report = createExecutionReport();
+        std::shared_ptr<FIX::Message> message;
+        if (msg_type == MsgType::ExecutionReport)
+            message = createExecutionReport();
+        else
+            message = createOrderCancelReject();
         auto fill_ecec_report = [&](auto &field, auto &value) {
             if (value.starts_with("input.")) {
                 auto val = getValue(value);
-                exec_report->setField(field, msg.getField(std::stoi(val)));
+                message->setField(field, msg.getField(std::stoi(val)));
             } else if (value.starts_with("call.")) {
                 auto func_name = getValue(value);
                 if (func_name == "uuid") {
-                    exec_report->setField(field, uuid());
+                    message->setField(field, uuid());
                 } else if (func_name == "getTzDateTime") {
-                    exec_report->setField(field, getTzDateTime());
+                    message->setField(field, getTzDateTime());
                 } else if (func_name == "randomNumber") {
-                    exec_report->setField(field, randomNumber());
+                    message->setField(field, randomNumber());
                 } else if (func_name == "increment") {
-                    exec_report->setField(field, increment());
+                    message->setField(field, increment());
                 } else {
                     SPDLOG_ERROR("Unrecognized: {}", value);
                 }
             } else {
-                exec_report->setField(field, value);
+                message->setField(field, value);
             }
         };
-        for (const auto &[field, value] : common_fields) {
+        for (const auto &[field, value] : common_fix_fields) {
             fill_ecec_report(field, value);
         }
-        for (const auto &[field, value] : reply) {
+        for (const auto &[field, value] : fix_fields) {
             fill_ecec_report(field, value);
         }
-        FIX::Session::sendToTarget(*exec_report, id);
+        FIX::Session::sendToTarget(*message, id);
     } catch (const std::exception &e) {
         SPDLOG_ERROR("{}", e.what());
     }
@@ -279,8 +310,8 @@ asio::awaitable<void> Application::loopTimer() {
         while (!m_timed.empty() && m_timed.begin()->first <= now) {
             auto data = std::move(m_timed.begin()->second);
             m_timed.erase(m_timed.begin());
-            auto &[id, reply, common_fields, msg] = data;
-            send(id, *reply, *common_fields, *msg);
+            auto &[id, fix_fields, common_fix_fields, msg, msg_type] = data;
+            send(id, *fix_fields, *common_fix_fields, *msg, msg_type);
         }
     }
 }

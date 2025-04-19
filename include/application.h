@@ -26,6 +26,12 @@
 
 using FixFieldMap = std::unordered_map<int32_t, std::string>;
 
+enum class MsgType : uint8_t {
+    ExecutionReport,
+    OrderCancelReject,
+};
+YCS_ADD_ENUM(MsgType, ExecutionReport, OrderCancelReject)
+
 enum class FixVersion : uint8_t {
     FIX40,
     FIX41,
@@ -39,8 +45,9 @@ YCS_ADD_ENUM(FixVersion, FIX40, FIX41, FIX42, FIX43, FIX44, FIX50)
 struct ReplyData {
     FixFieldMap reply;
     int32_t interval;
+    MsgType msg_type;
 };
-YCS_ADD_STRUCT(ReplyData, reply, interval)
+YCS_ADD_STRUCT(ReplyData, reply, interval, msg_type)
 
 struct SymbolsReplyData {
     FixFieldMap common_fields;
@@ -96,8 +103,9 @@ private:
     void addTimedTask(const FIX::SessionID &, std::vector<ReplyData> &,
                       FixFieldMap &, const std::shared_ptr<FIX::Message> &);
     std::shared_ptr<FIX::Message> createExecutionReport();
+    std::shared_ptr<FIX::Message> createOrderCancelReject();
     void send(const FIX::SessionID &, const FixFieldMap &, const FixFieldMap &,
-              const FIX::Message &);
+              const FIX::Message &, MsgType);
     asio::awaitable<void> loopTimer();
     asio::awaitable<void> startStress(std::vector<std::string>);
 
@@ -108,9 +116,10 @@ private:
 
     struct TimedData {
         FIX::SessionID id;
-        FixFieldMap *reply;
-        FixFieldMap *common_reply;
+        FixFieldMap *fix_fields;
+        FixFieldMap *common_fix_fields;
         std::shared_ptr<FIX::Message> msg;
+        MsgType msg_type;
     };
 
     std::multimap<std::chrono::system_clock::time_point, TimedData> m_timed;

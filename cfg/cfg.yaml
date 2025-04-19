@@ -19,11 +19,13 @@ custom_reply:
         60: "call.getTzDateTime" # Call the built-in getTzDateTime function
       reply_flow:
         - interval: -1 # Send accept execution report immediately
+          msg_type: "ExecutionReport"
           reply:
             39: "0" # accept
             20: "0"
             150: "0" # ExecType
         - interval: 5000 # Send fill execution report after 5 seconds, This interval is relative to the previous message
+          msg_type: "ExecutionReport"
           reply:
             39: "2" # fill
             20: "1"
@@ -38,11 +40,13 @@ custom_reply:
         symbols: ["USDJPY"] # if input.symbol in symbols, It uses the following reply_flow
         reply_flow:
           - interval: -1
+            msg_type: "ExecutionReport"
             reply:
               39: "8" # accept
               20: "0"
               150: "0" # ExecType
           - interval: 5000
+            msg_type: "ExecutionReport"
             reply:
               39: "9" # fill
               20: "1"
@@ -62,11 +66,13 @@ custom_reply:
         60: "call.getTzDateTime" # Call the built-in getTzDateTime function
       reply_flow:
         - interval: 1000
+          msg_type: "ExecutionReport"
           reply:
             39: "0" # accept
             20: "0"
             150: "0" # ExecType
         - interval: 5000
+          msg_type: "ExecutionReport"
           reply:
             39: "2" # fill
             20: "1"
