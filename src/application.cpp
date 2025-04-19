@@ -132,12 +132,6 @@ void Application::fromAdmin(const FIX::Message &, const FIX::SessionID &) {}
 
 void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
     try {
-        std::string symbol;
-        try {
-            symbol = msg.getField(FIX::FIELD::Symbol);
-        } catch (const std::exception &e) {
-            SPDLOG_ERROR("get FIX::FIELD::Symbol error: {}", e.what());
-        }
         for (auto &[check_cond_header, check_cond_body, default_reply_flow,
                     symbols_reply_flow] : m_cfg.custom_reply) {
             const auto &hdr = msg.getHeader();
@@ -164,8 +158,13 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
             auto msg_ptr = std::make_shared<FIX::Message>(msg);
             asio::post(*m_io_ctx, [id, this, &default_reply_flow,
                                    &symbols_reply_flow,
-                                   symbol = std::move(symbol),
                                    msg_ptr = std::move(msg_ptr)]() mutable {
+                std::string symbol;
+                try {
+                    symbol = msg_ptr->getField(FIX::FIELD::Symbol);
+                } catch (const std::exception &e) {
+                    SPDLOG_ERROR("getField: {}", e.what());
+                }
                 if (auto it = std::ranges::find_if(
                         symbols_reply_flow,
                         [&](const auto &flow) {
@@ -174,9 +173,11 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
                                    !flow.reply_flow.empty();
                         });
                     it != symbols_reply_flow.end()) {
-                    addTimedTask(id, it->reply_flow, msg_ptr);
+                    addTimedTask(id, it->reply_flow, it->common_fields,
+                                 msg_ptr);
                 } else {
-                    addTimedTask(id, default_reply_flow, msg_ptr);
+                    addTimedTask(id, default_reply_flow.reply_flow,
+                                 default_reply_flow.common_fields, msg_ptr);
                 }
             });
 
@@ -190,16 +191,19 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
 
 void Application::addTimedTask(const FIX::SessionID &id,
                                std::vector<ReplyData> &reply_flow,
+                               FixFieldMap &common,
                                const std::shared_ptr<FIX::Message> &msg_ptr) {
     std::chrono::milliseconds dut{0};
     for (auto &[reply, interval] : reply_flow) {
         if (interval <= 0) {
-            send(id, reply, *msg_ptr);
+            send(id, reply, common, *msg_ptr);
         } else {
             dut += std::chrono::milliseconds{interval};
             auto expiry = std::chrono::system_clock::now() + dut;
-            m_timed.emplace(
-                expiry, TimedData{.id = id, .reply = &reply, .msg = msg_ptr});
+            m_timed.emplace(expiry, TimedData{.id = id,
+                                              .reply = &reply,
+                                              .common_reply = &common,
+                                              .msg = msg_ptr});
         }
     }
 }
@@ -223,10 +227,11 @@ std::shared_ptr<FIX::Message> Application::createExecutionReport() {
 }
 
 void Application::send(const FIX::SessionID &id, const FixFieldMap &reply,
+                       const FixFieldMap &common_fields,
                        const FIX::Message &msg) {
     try {
         auto exec_report = createExecutionReport();
-        for (const auto &[field, value] : reply) {
+        auto fill_ecec_report = [&](auto &field, auto &value) {
             if (value.starts_with("input.")) {
                 auto val = getValue(value);
                 exec_report->setField(field, msg.getField(std::stoi(val)));
@@ -246,6 +251,12 @@ void Application::send(const FIX::SessionID &id, const FixFieldMap &reply,
             } else {
                 exec_report->setField(field, value);
             }
+        };
+        for (const auto &[field, value] : common_fields) {
+            fill_ecec_report(field, value);
+        }
+        for (const auto &[field, value] : reply) {
+            fill_ecec_report(field, value);
         }
         FIX::Session::sendToTarget(*exec_report, id);
     } catch (const std::exception &e) {
@@ -268,8 +279,8 @@ asio::awaitable<void> Application::loopTimer() {
         while (!m_timed.empty() && m_timed.begin()->first <= now) {
             auto data = std::move(m_timed.begin()->second);
             m_timed.erase(m_timed.begin());
-            auto &[id, reply, msg] = data;
-            send(id, *reply, *msg);
+            auto &[id, reply, common_fields, msg] = data;
+            send(id, *reply, *common_fields, *msg);
         }
     }
 }

@@ -1,6 +1,6 @@
 http_server_host: "0.0.0.0"
 http_server_port: 2025
-interval: 100
+interval: 100 # check message interval 100 ms
 fix_ini: ./cfg/fix.ini
 fix_version: "FIX42"
 stress_interval: 100000 # microsecond
@@ -11,75 +11,67 @@ custom_reply:
     check_condition_body:
       40: "1" # Market
     default_reply_flow:
-      - interval: -1 # Send accept execution report immediately
-        reply:
-          39: "0" # accept
-          37: "input.11" # use new order's 11 field fill it(37)
-          17: "call.uuid" # Call the built-in uuid function
-          20: "0"
-          54: "input.54"
-          55: "input.55"
-          60: "call.getTzDateTime" # Call the built-in getTzDateTime function
-          150: "0" # ExecType
-      - interval: 5000 # Send fill execution report after 5 seconds, This interval is relative to the previous message
-        reply:
-          39: "2" # fill
-          37: "input.11"
-          17: "call.uuid"
-          20: "1"
-          54: "input.54"
-          55: "input.55"
-          60: "call.getTzDateTime"
-          150: "2" # ExecType
+      common_fields:
+        17: "call.uuid" # Call the built-in uuid function
+        37: "input.11" # use new order's 11 field fill it(37)
+        54: "input.54"
+        55: "input.55"
+        60: "call.getTzDateTime" # Call the built-in getTzDateTime function
+      reply_flow:
+        - interval: -1 # Send accept execution report immediately
+          reply:
+            39: "0" # accept
+            20: "0"
+            150: "0" # ExecType
+        - interval: 5000 # Send fill execution report after 5 seconds, This interval is relative to the previous message
+          reply:
+            39: "2" # fill
+            20: "1"
+            150: "2" # ExecType
     symbols_reply_flow:
-      - symbols: ["USDJPY"] # if input.symbol in symbols, It uses the following reply_flow
+      - common_fields:
+          17: "call.uuid" # Call the built-in uuid function
+          37: "input.11" # use new order's 11 field fill it(37)
+          54: "input.54"
+          60: "call.getTzDateTime" # Call the built-in getTzDateTime function
+          55: "input.55"
+        symbols: ["USDJPY"] # if input.symbol in symbols, It uses the following reply_flow
         reply_flow:
           - interval: -1
             reply:
               39: "8" # accept
-              37: "input.11"
-              17: "call.uuid"
               20: "0"
-              54: "input.54"
-              55: "input.55"
-              60: "call.getTzDateTime"
               150: "0" # ExecType
           - interval: 5000
             reply:
               39: "9" # fill
-              37: "input.11"
-              17: "call.uuid"
               20: "1"
-              54: "input.54"
-              55: "input.55"
-              60: "call.getTzDateTime"
               150: "2" # ExecType
+              55: "TEST-USDJPY" # This will override the common fields settings
 
   - check_condition_header:
       35: "D" # new order
     check_condition_body:
       40: "2" # Limit
     default_reply_flow:
-      - interval: 1000
-        reply:
-          39: "0" # accept
-          37: "input.11"
-          17: "call.uuid"
-          20: "0"
-          54: "input.54"
-          55: "input.55"
-          60: "call.getTzDateTime"
-          150: "0" # ExecType
-      - interval: 5000
-        reply:
-          39: "2" # fill
-          37: "input.11"
-          17: "call.uuid"
-          20: "1"
-          54: "input.54"
-          55: "input.55"
-          60: "call.getTzDateTime"
-          150: "2" # ExecType
+      common_fields:
+        17: "call.uuid" # Call the built-in uuid function
+        37: "input.11" # use new order's 11 field fill it(37)
+        54: "input.54"
+        55: "input.55"
+        60: "call.getTzDateTime" # Call the built-in getTzDateTime function
+      reply_flow:
+        - interval: 1000
+          reply:
+            39: "0" # accept
+            20: "0"
+            150: "0" # ExecType
+        - interval: 5000
+          reply:
+            39: "2" # fill
+            20: "1"
+            150: "2" # ExecType
     symbols_reply_flow:
       - symbols: []
+        common_fields: {}
         reply_flow: []

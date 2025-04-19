@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <memory>
 #include <string>
 
@@ -20,6 +21,12 @@ int main(int argc, char **argv) {
             SPDLOG_ERROR("{}", error);
             return 1;
         }
+        std::ranges::sort(cfg.value().custom_reply, [](auto &p1, auto &p2) {
+            return (p1.check_condition_header.size() +
+                    p1.check_condition_body.size()) >
+                   (p2.check_condition_header.size() +
+                    p2.check_condition_body.size());
+        });
         auto [str, e] = yaml_cpp_struct::to_yaml(cfg.value());
 
         auto io_context = std::make_shared<asio::io_context>();

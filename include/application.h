@@ -43,15 +43,22 @@ struct ReplyData {
 YCS_ADD_STRUCT(ReplyData, reply, interval)
 
 struct SymbolsReplyData {
+    FixFieldMap common_fields;
     std::vector<std::string> symbols;
     std::vector<ReplyData> reply_flow;
 };
-YCS_ADD_STRUCT(SymbolsReplyData, symbols, reply_flow)
+YCS_ADD_STRUCT(SymbolsReplyData, common_fields, symbols, reply_flow)
+
+struct DefaultReplyData {
+    FixFieldMap common_fields;
+    std::vector<ReplyData> reply_flow;
+};
+YCS_ADD_STRUCT(DefaultReplyData, common_fields, reply_flow)
 
 struct Reply {
     FixFieldMap check_condition_header;
     FixFieldMap check_condition_body;
-    std::vector<ReplyData> default_reply_flow;
+    DefaultReplyData default_reply_flow;
     std::vector<SymbolsReplyData> symbols_reply_flow;
 };
 YCS_ADD_STRUCT(Reply, check_condition_header, check_condition_body,
@@ -87,9 +94,9 @@ public:
 
 private:
     void addTimedTask(const FIX::SessionID &, std::vector<ReplyData> &,
-                      const std::shared_ptr<FIX::Message> &);
+                      FixFieldMap &, const std::shared_ptr<FIX::Message> &);
     std::shared_ptr<FIX::Message> createExecutionReport();
-    void send(const FIX::SessionID &, const FixFieldMap &,
+    void send(const FIX::SessionID &, const FixFieldMap &, const FixFieldMap &,
               const FIX::Message &);
     asio::awaitable<void> loopTimer();
     asio::awaitable<void> startStress(std::vector<std::string>);
@@ -102,6 +109,7 @@ private:
     struct TimedData {
         FIX::SessionID id;
         FixFieldMap *reply;
+        FixFieldMap *common_reply;
         std::shared_ptr<FIX::Message> msg;
     };
 
