@@ -365,6 +365,14 @@ void Application::parseXml(const std::string &xml) {
                     json["Field"][name]["enum"] = tag_json["enum"];
                 }
             }
+            for (pugi::xml_node field : node.children("group")) {
+                auto name = field.attribute("name").value();
+                auto &tag_json = m_tag_mapping[name];
+                json["Field"][name]["tag"] = tag_json["tag"];
+                json["Field"][name]["type"] = tag_json["type"];
+                json["Field"][name]["required"] =
+                    field.attribute("required").value();
+            }
         }
         m_interface_mapping[interface_name] = json;
     };

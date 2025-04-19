@@ -450,4 +450,5 @@ curl http://127.0.0.1:2025/close/stress
 ```
 
 ### 3. Write configuration file
-[cfg.yaml](https://github.com/fantasy-peak/fixsim/blob/main/cfg/cfg.yaml)
+[example 1](https://github.com/fantasy-peak/fixsim/blob/main/cfg/cfg.yaml)
+[example 2](https://github.com/fantasy-peak/fixsim/blob/main/cfg/example_cfg.yaml)
