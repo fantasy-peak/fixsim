@@ -27,6 +27,13 @@ curl http://127.0.0.1:2025/OrderCancelRequest | jq
 curl http://127.0.0.1:2025/ExecutionReport | jq
 curl http://127.0.0.1:2025/OrderCancelReject | jq
 curl http://127.0.0.1:2025/BusinessMessageReject | jq
+
+curl http://127.0.0.1:2025/NewOrderSingleYaml
+curl http://127.0.0.1:2025/OrderCancelReplaceRequestYaml
+curl http://127.0.0.1:2025/OrderCancelRequestYaml
+curl http://127.0.0.1:2025/ExecutionReportYaml
+curl http://127.0.0.1:2025/OrderCancelRejectYaml
+curl http://127.0.0.1:2025/BusinessMessageRejectYaml
 ```
 
 ## Control message sending
@@ -450,5 +457,5 @@ curl http://127.0.0.1:2025/close/stress
 ```
 
 ### 3. Write configuration file
-[example 1](https://github.com/fantasy-peak/fixsim/blob/main/cfg/cfg.yaml)
-[example 2](https://github.com/fantasy-peak/fixsim/blob/main/cfg/example_cfg.yaml)
+[cfg_1.yaml](https://github.com/fantasy-peak/fixsim/blob/main/cfg/cfg_1.yaml)
+[cfg_2.yaml](https://github.com/fantasy-peak/fixsim/blob/main/cfg/cfg_2.yaml)

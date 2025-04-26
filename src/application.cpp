@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <memory>
 #include <ranges>
+#include <sstream>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <unordered_map>
 
 #include <quickfix/Message.h>
@@ -387,12 +387,25 @@ void Application::parseXml(const std::string &xml) {
 void Application::startHttpServer() {
     auto http_server = std::make_shared<httplib::Server>();
     auto route = [&](const std::string &path) {
-        http_server->Get(
-            std::format("/{}", path),
-            [this, path](const httplib::Request &, httplib::Response &res) {
+        auto handler = [this, path](const httplib::Request &req_path,
+                                    httplib::Response &res) {
+            if (req_path.path.ends_with("Yaml")) {
+                std::stringstream ss;
+                for (auto &[key, value] :
+                     m_interface_mapping[path]["Field"].items()) {
+                    ss << std::format("{}: {} # {}, required({}), type({})\n",
+                                      value["tag"].get<int>(), R"("")", key,
+                                      value["required"].get<std::string>(),
+                                      value["type"].get<std::string>());
+                }
+                res.set_content(ss.str(), "text/plain");
+            } else {
                 res.set_content(m_interface_mapping[path].dump(),
                                 "application/json");
-            });
+            }
+        };
+        http_server->Get(std::format("/{}", path), handler);
+        http_server->Get(std::format("/{}Yaml", path), handler);
     };
     route("NewOrderSingle");
     route("OrderCancelReplaceRequest");
