@@ -202,7 +202,7 @@ void Application::addTimedTask(const FIX::SessionID &id,
                                const std::shared_ptr<FIX::Message> &msg_ptr) {
     std::chrono::milliseconds dut{0};
     for (auto &[fix_fields, interval, msg_type] : reply_flow) {
-        if (interval <= 0) {
+        if (interval < 0) {
             send(id, fix_fields, common_fix_fields, *msg_ptr, msg_type);
         } else {
             dut += std::chrono::milliseconds{interval};
@@ -262,7 +262,7 @@ void Application::send(const FIX::SessionID &id, const FixFieldMap &fix_fields,
             message = createExecutionReport();
         else
             message = createOrderCancelReject();
-        auto fill_ecec_report = [&](auto &field, auto &value) {
+        auto fill_exec_report = [&](auto &field, auto &value) {
             if (value.starts_with("input.")) {
                 auto val = getValue(value);
                 message->setField(field, msg.getField(std::stoi(val)));
@@ -284,10 +284,10 @@ void Application::send(const FIX::SessionID &id, const FixFieldMap &fix_fields,
             }
         };
         for (const auto &[field, value] : common_fix_fields) {
-            fill_ecec_report(field, value);
+            fill_exec_report(field, value);
         }
         for (const auto &[field, value] : fix_fields) {
-            fill_ecec_report(field, value);
+            fill_exec_report(field, value);
         }
         FIX::Session::sendToTarget(*message, id);
     } catch (const std::exception &e) {

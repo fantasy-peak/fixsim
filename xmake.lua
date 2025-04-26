@@ -1,3 +1,5 @@
+add_rules("mode.release", "mode.debug")
+
 set_project("fixsim")
 set_version("1.0.0", {build = "%Y%m%d%H%M"})
 set_xmakever("2.9.9")
@@ -11,8 +13,6 @@ add_requires("spdlog", {configs={std_format=true}})
 add_requires("yaml_cpp_struct", "nlohmann_json", "quickfix", "uuid", "pugixml")
 
 set_languages("c++23")
-set_policy("check.auto_ignore_flags", false)
-add_cxflags("-O2 -Wall -Wextra -pedantic-errors -Wno-missing-field-initializers -Wno-ignored-qualifiers")
 add_includedirs("include")
 
 target("fixsim")
