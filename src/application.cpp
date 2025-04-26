@@ -31,6 +31,7 @@
 #include <asio/as_tuple.hpp>
 #include <asio/post.hpp>
 #include <pugixml.hpp>
+#include "quickfix/FixFieldNumbers.h"
 
 #include "application.h"
 
@@ -253,6 +254,16 @@ std::shared_ptr<FIX::Message> Application::createOrderCancelReject() {
     throw std::runtime_error("Unsupported FIX version");
 }
 
+void Application::setField(FIX::Message &message, int tag,
+                           const std::string &value) {
+    if (value == "bool:true" || value == "bool:fasle") {
+        FIX::BoolField field(tag, value == "bool:true" ? true : false);
+        message.setField(field);
+    } else {
+        message.setField(tag, value);
+    }
+}
+
 void Application::send(const FIX::SessionID &id, const FixFieldMap &fix_fields,
                        const FixFieldMap &common_fix_fields,
                        const FIX::Message &msg, MsgType msg_type) {
@@ -265,22 +276,22 @@ void Application::send(const FIX::SessionID &id, const FixFieldMap &fix_fields,
         auto fill_exec_report = [&](auto &field, auto &value) {
             if (value.starts_with("input.")) {
                 auto val = getValue(value);
-                message->setField(field, msg.getField(std::stoi(val)));
+                setField(*message, field, msg.getField(std::stoi(val)));
             } else if (value.starts_with("call.")) {
                 auto func_name = getValue(value);
                 if (func_name == "uuid") {
-                    message->setField(field, uuid());
+                    setField(*message, field, uuid());
                 } else if (func_name == "getTzDateTime") {
-                    message->setField(field, getTzDateTime());
+                    setField(*message, field, getTzDateTime());
                 } else if (func_name == "randomNumber") {
-                    message->setField(field, randomNumber());
+                    setField(*message, field, randomNumber());
                 } else if (func_name == "increment") {
-                    message->setField(field, increment());
+                    setField(*message, field, increment());
                 } else {
                     SPDLOG_ERROR("Unrecognized: {}", value);
                 }
             } else {
-                message->setField(field, value);
+                setField(*message, field, value);
             }
         };
         for (const auto &[field, value] : common_fix_fields) {
@@ -328,7 +339,7 @@ void Application::parseXml(const std::string &xml) {
         int number = field.attribute("number").as_int();
         std::string type = field.attribute("type").as_string();
         nlohmann::json json;
-        if (type == "CHAR") {
+        if (type == "CHAR" || type == "BOOLEAN") {
             for (pugi::xml_node value : field.children("value")) {
                 std::string enum_val = value.attribute("enum").as_string();
                 std::string desc = value.attribute("description").as_string();
@@ -499,9 +510,9 @@ asio::awaitable<void> Application::startStress(std::vector<std::string> csv) {
         }
         for (const auto &fix_fields : vec_fix_fields) {
             auto exec_report = createExecutionReport();
-            exec_report->setField(60, getTzDateTime());
+            exec_report->setField(FIX::FIELD::TransactTime, getTzDateTime());
             for (auto &[tag, value] : fix_fields) {
-                if (tag == 17)
+                if (tag == FIX::FIELD::ExecID)
                     exec_report->setField(tag, std::to_string(count++));
                 else
                     exec_report->setField(tag, value);

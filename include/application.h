@@ -108,6 +108,7 @@ private:
               const FIX::Message &, MsgType);
     asio::awaitable<void> loopTimer();
     asio::awaitable<void> startStress(std::vector<std::string>);
+    void setField(FIX::Message&, int tag, const std::string &value);
 
     std::shared_ptr<asio::io_context> m_io_ctx;
     Config m_cfg;
