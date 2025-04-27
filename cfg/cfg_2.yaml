@@ -14,8 +14,8 @@ custom_reply:
     default_reply_flow:
       common_fields:
         17: "call.uuid" # Call the built-in uuid function
-        37: "input.11" # use new order's 11 field fill it(37)
-        54: "input.54"
+        37: "call.createUniqueOrderID" # It will generate OrderID associated with input.11
+        54: "input.54" # use new order's 54 field fill it(54)
         55: "input.55"
         60: "call.getTzDateTime" # Call the built-in getTzDateTime function
       reply_flow:
@@ -43,7 +43,7 @@ custom_reply:
     default_reply_flow:
       common_fields:
         17: "call.uuid" # Call the built-in uuid function
-        37: "input.11" # use new order's 11 field fill it(37)
+        37: "call.createUniqueOrderID" # It will generate OrderID associated with input.11
         54: "input.54"
         55: "input.55"
         60: "call.getTzDateTime" # Call the built-in getTzDateTime function

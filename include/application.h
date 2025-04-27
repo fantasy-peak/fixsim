@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -108,7 +109,9 @@ private:
               const FIX::Message &, MsgType);
     asio::awaitable<void> loopTimer();
     asio::awaitable<void> startStress(std::vector<std::string>);
-    void setField(FIX::Message&, int tag, const std::string &value);
+    void setField(FIX::Message &, int tag, const std::string &value);
+    asio::awaitable<void> clear();
+    std::string createUniqueOrderID(const FIX::Message &);
 
     std::shared_ptr<asio::io_context> m_io_ctx;
     Config m_cfg;
@@ -133,6 +136,10 @@ private:
     std::unordered_map<std::string, nlohmann::json> m_interface_mapping;
     std::atomic_bool m_pause{false};
     std::atomic_bool m_close_stress{false};
+    std::unordered_map<
+        std::string,
+        std::tuple<std::chrono::system_clock::time_point, std::string>>
+        m_ClOrdID_OrderID_mapping;
 };
 
 #endif

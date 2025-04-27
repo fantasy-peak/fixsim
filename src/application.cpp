@@ -2,6 +2,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <format>
 #include <memory>
 #include <ranges>
 #include <sstream>
@@ -9,6 +10,7 @@
 #include <string_view>
 #include <unordered_map>
 
+#include <quickfix/FixFieldNumbers.h>
 #include <quickfix/Message.h>
 #include <quickfix/Session.h>
 #include <quickfix/fix40/ExecutionReport.h>
@@ -31,7 +33,6 @@
 #include <asio/as_tuple.hpp>
 #include <asio/post.hpp>
 #include <pugixml.hpp>
-#include "quickfix/FixFieldNumbers.h"
 
 #include "application.h"
 
@@ -80,13 +81,13 @@ std::string getValue(const std::string &value) {
     return std::string{ret[1]};
 }
 
-std::string getTzDateTime() {
+std::string getTzDateTime(std::string_view fmt = "{:%Y%m%d-%H:%M:%S}") {
     using namespace std::chrono;
     auto now = system_clock::now();
     auto now_ms = time_point_cast<milliseconds>(now);
     auto tz = locate_zone("UTC");
     zoned_time zt{tz, now_ms};
-    return std::format("{:%Y%m%d-%H:%M:%S}", zt);
+    return std::vformat(fmt, std::make_format_args(zt));
 }
 
 std::string uuid() {
@@ -116,6 +117,7 @@ Application::Application(std::shared_ptr<asio::io_context> ctx,
                          const Config &cfg)
     : m_io_ctx(std::move(ctx)), m_cfg(cfg) {
     asio::co_spawn(*m_io_ctx, loopTimer(), asio::detached);
+    asio::co_spawn(*m_io_ctx, clear(), asio::detached);
 }
 
 void Application::onCreate(const FIX::SessionID &id) {
@@ -287,6 +289,8 @@ void Application::send(const FIX::SessionID &id, const FixFieldMap &fix_fields,
                     setField(*message, field, randomNumber());
                 } else if (func_name == "increment") {
                     setField(*message, field, increment());
+                } else if (func_name == "createUniqueOrderID") {
+                    setField(*message, field, createUniqueOrderID(msg));
                 } else {
                     SPDLOG_ERROR("Unrecognized: {}", value);
                 }
@@ -324,6 +328,23 @@ asio::awaitable<void> Application::loopTimer() {
             auto &[id, fix_fields, common_fix_fields, msg, msg_type] = data;
             send(id, *fix_fields, *common_fix_fields, *msg, msg_type);
         }
+    }
+}
+
+asio::awaitable<void> Application::clear() {
+    asio::steady_timer timer(*m_io_ctx);
+    for (;;) {
+        timer.expires_after(std::chrono::seconds(600));
+        auto [ec] =
+            co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
+        if (ec)
+            break;
+        auto now = std::chrono::system_clock::now();
+        std::erase_if(m_ClOrdID_OrderID_mapping, [&](auto &p) mutable {
+            auto &[point, str] = std::get<1>(p);
+            auto dut = now - point;
+            return dut > std::chrono::hours(1) ? true : false;
+        });
     }
 }
 
@@ -526,4 +547,29 @@ asio::awaitable<void> Application::startStress(std::vector<std::string> csv) {
         }
     }
     co_return;
+}
+
+std::string Application::createUniqueOrderID(const FIX::Message &msg) {
+    static std::atomic_uint64_t count = 1;
+    std::string cl_ord_id;
+    try {
+        cl_ord_id = msg.getField(FIX::FIELD::ClOrdID);
+    } catch (const std::exception &e) {
+        SPDLOG_ERROR("getField: {}", e.what());
+        auto order_id =
+            std::format("fixsim.{}.{}", getTzDateTime("{:%Y%m%d.%H%M%S}"),
+                        count.fetch_add(1, std::memory_order::relaxed));
+        return order_id;
+    }
+    if (m_ClOrdID_OrderID_mapping.contains(cl_ord_id)) {
+        const auto &[point, id] = m_ClOrdID_OrderID_mapping[cl_ord_id];
+        return id;
+    }
+    using namespace std::chrono;
+    auto order_id =
+        std::format("fixsim.{}.{}", getTzDateTime("{:%Y%m%d.%H%M%S}"),
+                    count.fetch_add(1, std::memory_order::relaxed));
+    m_ClOrdID_OrderID_mapping.emplace(
+        cl_ord_id, std::make_tuple(std::chrono::system_clock::now(), order_id));
+    return order_id;
 }
