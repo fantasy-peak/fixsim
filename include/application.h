@@ -124,6 +124,8 @@ private:
     void setField(FIX::Message &, int tag, const std::string &value);
     asio::awaitable<void> clear();
     std::string createUniqueOrderID(const FIX::Message &);
+    void fillExecReport(std::shared_ptr<FIX::Message> &, const FIX::Message &,
+                        int, const std::string &);
 
     std::shared_ptr<asio::io_context> m_io_ctx;
     Config m_cfg;

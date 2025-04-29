@@ -191,7 +191,7 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
                                    msg_ptr = std::move(msg_ptr)]() mutable {
                 std::string symbol;
                 try {
-                    auto cl_ord_id = msg_ptr->getField(FIX::FIELD::ClOrdID);
+                    auto &cl_ord_id = msg_ptr->getField(FIX::FIELD::ClOrdID);
                     // Check if order_id is duplicated
                     if (!check_cl_order_id.empty()) {
                         if (auto result = m_order_ids.insert(cl_ord_id);
@@ -253,41 +253,28 @@ void Application::addTimedTask(const FIX::SessionID &id,
     }
 }
 
-std::shared_ptr<FIX::Message> Application::createExecutionReport() {
-    switch (m_cfg.fix_version) {
-        case FixVersion::FIX40:
-            return std::make_shared<FIX40::ExecutionReport>();
-        case FixVersion::FIX41:
-            return std::make_shared<FIX41::ExecutionReport>();
-        case FixVersion::FIX42:
-            return std::make_shared<FIX42::ExecutionReport>();
-        case FixVersion::FIX43:
-            return std::make_shared<FIX43::ExecutionReport>();
-        case FixVersion::FIX44:
-            return std::make_shared<FIX44::ExecutionReport>();
-        case FixVersion::FIX50:
-            return std::make_shared<FIX50::ExecutionReport>();
-    }
+#define CREATE_FIX_MESSAGE_BY_VERSION(msg_type)         \
+    switch (m_cfg.fix_version) {                        \
+        case FixVersion::FIX40:                         \
+            return std::make_shared<FIX40::msg_type>(); \
+        case FixVersion::FIX41:                         \
+            return std::make_shared<FIX41::msg_type>(); \
+        case FixVersion::FIX42:                         \
+            return std::make_shared<FIX42::msg_type>(); \
+        case FixVersion::FIX43:                         \
+            return std::make_shared<FIX43::msg_type>(); \
+        case FixVersion::FIX44:                         \
+            return std::make_shared<FIX44::msg_type>(); \
+        case FixVersion::FIX50:                         \
+            return std::make_shared<FIX50::msg_type>(); \
+    }                                                   \
     throw std::runtime_error("Unsupported FIX version");
-}
 
-std::shared_ptr<FIX::Message> Application::createOrderCancelReject() {
-    switch (m_cfg.fix_version) {
-        case FixVersion::FIX40:
-            return std::make_shared<FIX40::OrderCancelReject>();
-        case FixVersion::FIX41:
-            return std::make_shared<FIX41::OrderCancelReject>();
-        case FixVersion::FIX42:
-            return std::make_shared<FIX42::OrderCancelReject>();
-        case FixVersion::FIX43:
-            return std::make_shared<FIX43::OrderCancelReject>();
-        case FixVersion::FIX44:
-            return std::make_shared<FIX44::OrderCancelReject>();
-        case FixVersion::FIX50:
-            return std::make_shared<FIX50::OrderCancelReject>();
-    }
-    throw std::runtime_error("Unsupported FIX version");
-}
+std::shared_ptr<FIX::Message> Application::createExecutionReport(){
+    CREATE_FIX_MESSAGE_BY_VERSION(ExecutionReport)}
+
+std::shared_ptr<FIX::Message> Application::createOrderCancelReject(){
+    CREATE_FIX_MESSAGE_BY_VERSION(OrderCancelReject)}
 
 std::shared_ptr<FIX::Message> Application::createTradingSessionStatus() {
     switch (m_cfg.fix_version) {
@@ -318,6 +305,32 @@ void Application::setField(FIX::Message &message, int tag,
     }
 }
 
+void Application::fillExecReport(std::shared_ptr<FIX::Message> &message,
+                                 const FIX::Message &msg, int field,
+                                 const std::string &value) {
+    if (value.starts_with("input.")) {
+        auto val = getValue(value);
+        setField(*message, field, msg.getField(std::stoi(val)));
+    } else if (value.starts_with("call.")) {
+        auto func_name = getValue(value);
+        if (func_name == "uuid") {
+            setField(*message, field, uuid());
+        } else if (func_name == "getTzDateTime") {
+            setField(*message, field, getTzDateTime());
+        } else if (func_name == "randomNumber") {
+            setField(*message, field, randomNumber());
+        } else if (func_name == "increment") {
+            setField(*message, field, increment());
+        } else if (func_name == "createUniqueOrderID") {
+            setField(*message, field, createUniqueOrderID(msg));
+        } else {
+            SPDLOG_ERROR("Unrecognized: {}", value);
+        }
+    } else {
+        setField(*message, field, value);
+    }
+}
+
 void Application::send(const FIX::SessionID &id, const FixFieldMap &fix_fields,
                        const FixFieldMap &common_fix_fields,
                        const FIX::Message &msg, MsgType msg_type) {
@@ -327,34 +340,11 @@ void Application::send(const FIX::SessionID &id, const FixFieldMap &fix_fields,
             message = createExecutionReport();
         else
             message = createOrderCancelReject();
-        auto fill_exec_report = [&](auto &field, auto &value) {
-            if (value.starts_with("input.")) {
-                auto val = getValue(value);
-                setField(*message, field, msg.getField(std::stoi(val)));
-            } else if (value.starts_with("call.")) {
-                auto func_name = getValue(value);
-                if (func_name == "uuid") {
-                    setField(*message, field, uuid());
-                } else if (func_name == "getTzDateTime") {
-                    setField(*message, field, getTzDateTime());
-                } else if (func_name == "randomNumber") {
-                    setField(*message, field, randomNumber());
-                } else if (func_name == "increment") {
-                    setField(*message, field, increment());
-                } else if (func_name == "createUniqueOrderID") {
-                    setField(*message, field, createUniqueOrderID(msg));
-                } else {
-                    SPDLOG_ERROR("Unrecognized: {}", value);
-                }
-            } else {
-                setField(*message, field, value);
-            }
-        };
         for (const auto &[field, value] : common_fix_fields) {
-            fill_exec_report(field, value);
+            fillExecReport(message, msg, field, value);
         }
         for (const auto &[field, value] : fix_fields) {
-            fill_exec_report(field, value);
+            fillExecReport(message, msg, field, value);
         }
         FIX::Session::sendToTarget(*message, id);
     } catch (const std::exception &e) {
@@ -415,7 +405,7 @@ asio::awaitable<void> Application::clear() {
         std::erase_if(m_ClOrdID_OrderID_mapping, [&](auto &p) mutable {
             auto &[point, str] = std::get<1>(p);
             auto dut = now - point;
-            return dut > std::chrono::hours(1) ? true : false;
+            return dut > std::chrono::hours(24) ? true : false;
         });
     }
 }
@@ -635,9 +625,19 @@ asio::awaitable<void> Application::startStress(std::vector<std::string> csv) {
 
 std::string Application::createUniqueOrderID(const FIX::Message &msg) {
     static std::atomic_uint64_t count = 1;
-    std::string cl_ord_id;
     try {
-        cl_ord_id = msg.getField(FIX::FIELD::ClOrdID);
+        auto &cl_ord_id = msg.getField(FIX::FIELD::ClOrdID);
+        if (m_ClOrdID_OrderID_mapping.contains(cl_ord_id)) {
+            const auto &[point, id] = m_ClOrdID_OrderID_mapping[cl_ord_id];
+            return id;
+        }
+        auto order_id =
+            std::format("fixsim.{}.{}", getTzDateTime("{:%Y%m%d.%H%M%S}"),
+                        count.fetch_add(1, std::memory_order::relaxed));
+        m_ClOrdID_OrderID_mapping.emplace(
+            cl_ord_id,
+            std::make_tuple(std::chrono::system_clock::now(), order_id));
+        return order_id;
     } catch (const std::exception &e) {
         SPDLOG_ERROR("getField: {}", e.what());
         auto order_id =
@@ -645,15 +645,4 @@ std::string Application::createUniqueOrderID(const FIX::Message &msg) {
                         count.fetch_add(1, std::memory_order::relaxed));
         return order_id;
     }
-    if (m_ClOrdID_OrderID_mapping.contains(cl_ord_id)) {
-        const auto &[point, id] = m_ClOrdID_OrderID_mapping[cl_ord_id];
-        return id;
-    }
-    using namespace std::chrono;
-    auto order_id =
-        std::format("fixsim.{}.{}", getTzDateTime("{:%Y%m%d.%H%M%S}"),
-                    count.fetch_add(1, std::memory_order::relaxed));
-    m_ClOrdID_OrderID_mapping.emplace(
-        cl_ord_id, std::make_tuple(std::chrono::system_clock::now(), order_id));
-    return order_id;
 }
