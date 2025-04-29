@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 
 #include <quickfix/FixFieldNumbers.h>
 #include <quickfix/Message.h>
@@ -26,6 +27,11 @@
 #include <quickfix/fix43/OrderCancelReject.h>
 #include <quickfix/fix44/OrderCancelReject.h>
 #include <quickfix/fix50/OrderCancelReject.h>
+
+#include <quickfix/fix42/TradingSessionStatus.h>
+#include <quickfix/fix43/TradingSessionStatus.h>
+#include <quickfix/fix44/TradingSessionStatus.h>
+#include <quickfix/fix50/TradingSessionStatus.h>
 
 #include <httplib.h>
 #include <spdlog/spdlog.h>
@@ -128,6 +134,19 @@ void Application::onCreate(const FIX::SessionID &id) {
 
 void Application::onLogon(const FIX::SessionID &id) {
     SPDLOG_INFO("onLogon: [{}]", id.toString());
+    if (m_cfg.trading_session_status.empty())
+        return;
+    SPDLOG_INFO("start send Tss: [{}]", id.toString());
+    asio::co_spawn(*m_io_ctx, sendTss(id), [](std::exception_ptr ep) {
+        if (ep) {
+            try {
+                std::rethrow_exception(ep);
+            } catch (const std::exception &e) {
+                SPDLOG_ERROR("Caught exception in completion handler: {}",
+                             e.what());
+            }
+        }
+    });
 }
 
 void Application::onLogout(const FIX::SessionID &id) {
@@ -256,6 +275,25 @@ std::shared_ptr<FIX::Message> Application::createOrderCancelReject() {
     throw std::runtime_error("Unsupported FIX version");
 }
 
+std::shared_ptr<FIX::Message> Application::createTradingSessionStatus() {
+    switch (m_cfg.fix_version) {
+        case FixVersion::FIX40:
+        case FixVersion::FIX41: {
+            SPDLOG_DEBUG("error fix version");
+            std::terminate();
+        }
+        case FixVersion::FIX42:
+            return std::make_shared<FIX42::TradingSessionStatus>();
+        case FixVersion::FIX43:
+            return std::make_shared<FIX43::TradingSessionStatus>();
+        case FixVersion::FIX44:
+            return std::make_shared<FIX44::TradingSessionStatus>();
+        case FixVersion::FIX50:
+            return std::make_shared<FIX50::TradingSessionStatus>();
+    }
+    throw std::runtime_error("Unsupported FIX version");
+}
+
 void Application::setField(FIX::Message &message, int tag,
                            const std::string &value) {
     if (value == "bool:true" || value == "bool:fasle") {
@@ -307,6 +345,26 @@ void Application::send(const FIX::SessionID &id, const FixFieldMap &fix_fields,
         FIX::Session::sendToTarget(*message, id);
     } catch (const std::exception &e) {
         SPDLOG_ERROR("{}", e.what());
+    }
+}
+
+asio::awaitable<void> Application::sendTss(FIX::SessionID id) {
+    asio::steady_timer timer(*m_io_ctx);
+    for (auto &[reply, interval] : m_cfg.trading_session_status) {
+        auto message = createTradingSessionStatus();
+        for (auto &[tag, value] : reply) {
+            setField(*message, tag, value);
+        }
+        if (interval < 0) {
+            FIX::Session::sendToTarget(*message, id);
+            continue;
+        }
+        timer.expires_after(std::chrono::milliseconds(interval));
+        auto [ec] =
+            co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
+        if (ec)
+            break;
+        FIX::Session::sendToTarget(*message, id);
     }
 }
 
@@ -414,6 +472,7 @@ void Application::parseXml(const std::string &xml) {
     parse_interface("ExecutionReport");
     parse_interface("OrderCancelReject");
     parse_interface("BusinessMessageReject");
+    parse_interface("TradingSessionStatus");
 }
 
 void Application::startHttpServer() {
@@ -455,6 +514,7 @@ void Application::startHttpServer() {
     route("ExecutionReport");
     route("OrderCancelReject");
     route("BusinessMessageReject");
+    route("TradingSessionStatus");
     http_server->Get("/tag_list",
                      [this](const httplib::Request &, httplib::Response &res) {
                          res.set_content(m_tag_list.dump(), "application/json");

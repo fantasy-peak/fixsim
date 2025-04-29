@@ -5,6 +5,16 @@ fix_ini: ./cfg/fix.ini
 fix_version: "FIX42"
 stress_interval: 100000 # microsecond
 
+trading_session_status:
+  - interval: -1
+    reply:
+      340: "2" # open
+      336: "TradingSessionID"
+  - interval: 5000
+    reply:
+      340: "3" # close
+      336: "TradingSessionID"
+
 custom_reply:
   - check_condition_header:
       35: "D" # new order

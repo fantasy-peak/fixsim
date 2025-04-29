@@ -43,6 +43,12 @@ enum class FixVersion : uint8_t {
 };
 YCS_ADD_ENUM(FixVersion, FIX40, FIX41, FIX42, FIX43, FIX44, FIX50)
 
+struct TradingSessionStatus {
+    FixFieldMap reply;
+    int32_t interval;
+};
+YCS_ADD_STRUCT(TradingSessionStatus, reply, interval)
+
 struct ReplyData {
     FixFieldMap reply;
     int32_t interval;
@@ -79,10 +85,12 @@ struct Config {
     int32_t interval;
     std::string fix_ini;
     std::chrono::microseconds stress_interval;
+    std::vector<TradingSessionStatus> trading_session_status;
     std::vector<Reply> custom_reply;
 };
 YCS_ADD_STRUCT(Config, fix_version, http_server_host, http_server_port,
-               interval, fix_ini, stress_interval, custom_reply)
+               interval, fix_ini, stress_interval, trading_session_status,
+               custom_reply)
 
 class Application : public FIX::Application {
 public:
@@ -105,10 +113,12 @@ private:
                       FixFieldMap &, const std::shared_ptr<FIX::Message> &);
     std::shared_ptr<FIX::Message> createExecutionReport();
     std::shared_ptr<FIX::Message> createOrderCancelReject();
+    std::shared_ptr<FIX::Message> createTradingSessionStatus();
     void send(const FIX::SessionID &, const FixFieldMap &, const FixFieldMap &,
               const FIX::Message &, MsgType);
     asio::awaitable<void> loopTimer();
     asio::awaitable<void> startStress(std::vector<std::string>);
+    asio::awaitable<void> sendTss(FIX::SessionID);
     void setField(FIX::Message &, int tag, const std::string &value);
     asio::awaitable<void> clear();
     std::string createUniqueOrderID(const FIX::Message &);

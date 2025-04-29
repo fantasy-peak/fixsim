@@ -27,6 +27,7 @@ curl http://127.0.0.1:2025/OrderCancelRequest | jq
 curl http://127.0.0.1:2025/ExecutionReport | jq
 curl http://127.0.0.1:2025/OrderCancelReject | jq
 curl http://127.0.0.1:2025/BusinessMessageReject | jq
+curl http://127.0.0.1:2025/TradingSessionStatus | jq
 
 curl http://127.0.0.1:2025/NewOrderSingleYaml
 curl http://127.0.0.1:2025/OrderCancelReplaceRequestYaml
@@ -34,6 +35,7 @@ curl http://127.0.0.1:2025/OrderCancelRequestYaml
 curl http://127.0.0.1:2025/ExecutionReportYaml
 curl http://127.0.0.1:2025/OrderCancelRejectYaml
 curl http://127.0.0.1:2025/BusinessMessageRejectYaml
+curl http://127.0.0.1:2025/TradingSessionStatusYaml
 ```
 
 ## Control message sending
