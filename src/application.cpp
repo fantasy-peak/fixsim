@@ -161,8 +161,9 @@ void Application::fromAdmin(const FIX::Message &, const FIX::SessionID &) {}
 
 void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
     try {
-        for (auto &[check_cond_header, check_cond_body, default_reply_flow,
-                    symbols_reply_flow] : m_cfg.custom_reply) {
+        for (auto &[check_cond_header, check_cond_body, check_cl_order_id,
+                    default_reply_flow, symbols_reply_flow] :
+             m_cfg.custom_reply) {
             const auto &hdr = msg.getHeader();
             const auto &body = msg;
 
@@ -186,14 +187,27 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
 
             auto msg_ptr = std::make_shared<FIX::Message>(msg);
             asio::post(*m_io_ctx, [id, this, &default_reply_flow,
-                                   &symbols_reply_flow,
+                                   &symbols_reply_flow, &check_cl_order_id,
                                    msg_ptr = std::move(msg_ptr)]() mutable {
                 std::string symbol;
                 try {
+                    auto cl_ord_id = msg_ptr->getField(FIX::FIELD::ClOrdID);
+                    // Check if order_id is duplicated
+                    if (!check_cl_order_id.empty()) {
+                        if (auto result = m_order_ids.insert(cl_ord_id);
+                            !result.second) {
+                            SPDLOG_INFO("duplicated order: {}", cl_ord_id);
+                            static FixFieldMap map;
+                            send(id, check_cl_order_id, map, *msg_ptr,
+                                 MsgType::ExecutionReport);
+                            return;
+                        }
+                    }
                     symbol = msg_ptr->getField(FIX::FIELD::Symbol);
                 } catch (const std::exception &e) {
                     SPDLOG_ERROR("getField: {}", e.what());
                 }
+
                 if (auto it = std::ranges::find_if(
                         symbols_reply_flow,
                         [&](const auto &flow) {

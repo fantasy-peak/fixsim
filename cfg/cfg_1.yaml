@@ -20,6 +20,15 @@ custom_reply:
       35: "D" # new order
     check_condition_body:
       40: "1" # Market
+    check_cl_order_id:
+      39: "2"
+      20: "1"
+      150: "8" # ExecType
+      17: "call.uuid" # Call the built-in uuid function
+      37: "input.11" # use new order's 11 field fill it(37)
+      54: "input.54"
+      55: "input.55"
+      60: "call.getTzDateTime" # Call the built-in getTzDateTime function
     default_reply_flow:
       common_fields:
         17: "call.uuid" # Call the built-in uuid function
@@ -67,6 +76,7 @@ custom_reply:
       35: "D" # new order
     check_condition_body:
       40: "2" # Limit
+    check_cl_order_id: {}
     default_reply_flow:
       common_fields:
         17: "call.uuid" # Call the built-in uuid function

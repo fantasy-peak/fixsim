@@ -21,6 +21,7 @@ custom_reply:
     check_condition_body:
       40: "1" # Market
       55: "USDJPY"
+    check_cl_order_id: {}
     default_reply_flow:
       common_fields:
         17: "call.uuid" # Call the built-in uuid function
@@ -50,6 +51,7 @@ custom_reply:
       35: "D" # new order
     check_condition_body:
       40: "2" # Limit
+    check_cl_order_id: {}
     default_reply_flow:
       common_fields:
         17: "call.uuid" # Call the built-in uuid function

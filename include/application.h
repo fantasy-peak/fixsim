@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <set>
 #include <string>
 #include <thread>
 #include <tuple>
@@ -72,11 +73,12 @@ YCS_ADD_STRUCT(DefaultReplyData, common_fields, reply_flow)
 struct Reply {
     FixFieldMap check_condition_header;
     FixFieldMap check_condition_body;
+    FixFieldMap check_cl_order_id;
     DefaultReplyData default_reply_flow;
     std::vector<SymbolsReplyData> symbols_reply_flow;
 };
 YCS_ADD_STRUCT(Reply, check_condition_header, check_condition_body,
-               default_reply_flow, symbols_reply_flow)
+               check_cl_order_id, default_reply_flow, symbols_reply_flow)
 
 struct Config {
     FixVersion fix_version;
@@ -150,6 +152,7 @@ private:
         std::string,
         std::tuple<std::chrono::system_clock::time_point, std::string>>
         m_ClOrdID_OrderID_mapping;
+    std::set<std::string> m_order_ids;
 };
 
 #endif
