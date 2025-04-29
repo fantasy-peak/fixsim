@@ -422,15 +422,25 @@ void Application::startHttpServer() {
         auto handler = [this, path](const httplib::Request &req_path,
                                     httplib::Response &res) {
             if (req_path.path.ends_with("Yaml")) {
-                std::stringstream ss;
+                std::stringstream ss_y;
+                std::stringstream ss_n;
                 for (auto &[key, value] :
                      m_interface_mapping[path]["Field"].items()) {
-                    ss << std::format("{}: {} # {}, required({}), type({})\n",
-                                      value["tag"].get<int>(), R"("")", key,
-                                      value["required"].get<std::string>(),
-                                      value["type"].get<std::string>());
+                    if (value["required"].get<std::string>() == "Y") {
+                        ss_y << std::format(
+                            "{}: {} # {}, required({}), type({})\n",
+                            value["tag"].get<int>(), R"("")", key,
+                            value["required"].get<std::string>(),
+                            value["type"].get<std::string>());
+                    } else {
+                        ss_n << std::format(
+                            "{}: {} # {}, required({}), type({})\n",
+                            value["tag"].get<int>(), R"("")", key,
+                            value["required"].get<std::string>(),
+                            value["type"].get<std::string>());
+                    }
                 }
-                res.set_content(ss.str(), "text/plain");
+                res.set_content(ss_y.str() + ss_n.str(), "text/plain");
             } else {
                 res.set_content(m_interface_mapping[path].dump(),
                                 "application/json");
