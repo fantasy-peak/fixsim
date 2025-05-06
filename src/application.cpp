@@ -311,6 +311,21 @@ void Application::fillExecReport(std::shared_ptr<FIX::Message> &message,
     if (value.starts_with("input.")) {
         auto val = getValue(value);
         setField(*message, field, msg.getField(std::stoi(val)));
+    } else if (value.starts_with("if_input.")) {
+        auto val = getValue(value);
+        auto field = std::stoi(val);
+        if (msg.isSetField(field)) {
+            setField(*message, field, msg.getField(field));
+        }
+    } else if (value.starts_with("input_header.")) {
+        auto val = getValue(value);
+        setField(*message, field, msg.getHeader().getField(std::stoi(val)));
+    } else if (value.starts_with("if_input_header.")) {
+        auto val = getValue(value);
+        auto field = std::stoi(val);
+        if (msg.getHeader().isSetField(field)) {
+            setField(*message, field, msg.getHeader().getField(field));
+        }
     } else if (value.starts_with("call.")) {
         auto func_name = getValue(value);
         if (func_name == "uuid") {
