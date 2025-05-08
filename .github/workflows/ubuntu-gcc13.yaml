@@ -36,4 +36,11 @@ jobs:
           export CC=gcc-13
           xmake build -y
           xmake install -o .
+          tar -czvf fixsim.tar.gz bin
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fix_sim_binary
+          path: fixsim.tar.gz
+          retention-days: 7
