@@ -10,7 +10,7 @@ add_repositories("my_private_repo https://github.com/fantasy-peak/xmake-repo.git
 
 add_requires("asio asio-1-34-2", "cpp-httplib v0.18.0")
 add_requires("spdlog", {configs={std_format=true}})
-add_requires("yaml_cpp_struct", "nlohmann_json", "quickfix", "uuid", "pugixml")
+add_requires("yaml_cpp_struct", "nlohmann_json", "quickfix", "libuuid", "pugixml")
 
 set_languages("c++23")
 add_includedirs("include")
@@ -19,5 +19,5 @@ target("fixsim")
     set_kind("binary")
     add_files("src/*.cpp")
     add_ldflags("-static-libstdc++", "-static-libgcc", {force = true})
-    add_packages("yaml_cpp_struct", "nlohmann_json", "spdlog", "quickfix", "asio", "uuid", "pugixml", "cpp-httplib")
+    add_packages("yaml_cpp_struct", "nlohmann_json", "spdlog", "quickfix", "asio", "libuuid", "pugixml", "cpp-httplib")
 target_end()

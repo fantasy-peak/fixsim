@@ -1,0 +1,52 @@
+name: rockylinux8-gcc13
+
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: rockylinux/rockylinux:8
+      options: --privileged
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Build Dependencies
+        run: |
+          set -o xtrace
+          dnf -y install dnf-plugins-core
+          dnf -y config-manager --set-enabled powertools
+          dnf -y install \
+             https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+          rpmkeys --import /etc/pki/rpm-gpg/RPM-GPG-KEY-*
+          dnf -y --exclude=systemtap --exclude=subversion install @development \
+             wget cmake git\
+             openssl-devel \
+             gcc-toolset-13*
+
+      - name: checkout
+        uses: actions/checkout@v3
+      - name: build
+        run: |
+          wget https://github.com/xmake-io/xmake/releases/download/v2.9.9/xmake-v2.9.9.gz.run
+          chmod 777 xmake-v2.9.9.gz.run
+          ./xmake-v2.9.9.gz.run
+          source ~/.xmake/profile
+          source /opt/rh/gcc-toolset-13/enable
+          export XMAKE_ROOT="y"
+          xmake --version
+          ls -lrt
+          xmake build -y
+          xmake install -o .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixsim_bin
+          path: bin
+          retention-days: 40
