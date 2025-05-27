@@ -170,7 +170,11 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
             bool header_match =
                 std::ranges::all_of(check_cond_header, [&](const auto &cond) {
                     const auto &[field, expected] = cond;
-                    return hdr.getField(field) == expected;
+                    auto value = hdr.getField(field);
+                    if (expected == "optional(none)") {
+                        return true;
+                    }
+                    return value == expected;
                 });
 
             if (!header_match)
@@ -179,7 +183,11 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
             bool body_match =
                 std::ranges::all_of(check_cond_body, [&](const auto &cond) {
                     const auto &[field, expected] = cond;
-                    return body.getField(field) == expected;
+                    auto value = body.getField(field);
+                    if (expected == "optional(none)") {
+                        return true;
+                    }
+                    return value == expected;
                 });
 
             if (!body_match)

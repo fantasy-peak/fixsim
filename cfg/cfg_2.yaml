@@ -19,7 +19,7 @@ custom_reply:
   - check_condition_header:
       35: "D" # new order
     check_condition_body:
-      40: "1" # Market
+      40: "1" # Market, if config "optional(none)", It only checks whether the 40 exist, without checking the values
       55: "USDJPY"
     check_cl_order_id: {}
     default_reply_flow:
