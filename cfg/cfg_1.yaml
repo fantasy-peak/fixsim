@@ -5,6 +5,8 @@ fix_ini: ./cfg/fix.ini
 fix_version: "FIX42"
 stress_interval: 100000 # microsecond
 
+header: { 43: "N" }
+
 trading_session_status:
   - interval: -1
     reply:

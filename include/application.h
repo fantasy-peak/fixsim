@@ -88,11 +88,12 @@ struct Config {
     std::string fix_ini;
     std::chrono::microseconds stress_interval;
     std::vector<TradingSessionStatus> trading_session_status;
+    std::optional<FixFieldMap> header;
     std::vector<Reply> custom_reply;
 };
 YCS_ADD_STRUCT(Config, fix_version, http_server_host, http_server_port,
                interval, fix_ini, stress_interval, trading_session_status,
-               custom_reply)
+               header, custom_reply)
 
 class Application : public FIX::Application {
 public:

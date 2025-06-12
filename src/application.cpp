@@ -155,7 +155,18 @@ void Application::onLogout(const FIX::SessionID &id) {
 
 void Application::toAdmin(FIX::Message &, const FIX::SessionID &) {}
 
-void Application::toApp(FIX::Message &, const FIX::SessionID &) {}
+void Application::toApp(FIX::Message &message, const FIX::SessionID &) {
+    if (!m_cfg.header.has_value())
+        return;
+    for (auto &[tag, value] : m_cfg.header.value()) {
+        if (value.starts_with("bool:")) {
+            FIX::BoolField field(tag, value == "bool:true" ? true : false);
+            message.getHeader().setField(field);
+        } else {
+            message.getHeader().setField(tag, value);
+        }
+    }
+}
 
 void Application::fromAdmin(const FIX::Message &, const FIX::SessionID &) {}
 
@@ -305,7 +316,7 @@ std::shared_ptr<FIX::Message> Application::createTradingSessionStatus() {
 
 void Application::setField(FIX::Message &message, int tag,
                            const std::string &value) {
-    if (value == "bool:true" || value == "bool:fasle") {
+    if (value == "bool:true" || value == "bool:false") {
         FIX::BoolField field(tag, value == "bool:true" ? true : false);
         message.setField(field);
     } else {
