@@ -7,8 +7,14 @@ stress_interval: 100000 # microsecond
 
 header: { 43: "N" }
 
+logon_response:
+  msgtype: "U9"
+  reply:
+    98: "input.98" # Logon's 98 field
+    108: "input.108" # Logon's 98 field
+
 trading_session_status:
-  - interval: -1
+  - interval: 5000
     reply:
       340: "2" # open
       336: "TradingSessionID"

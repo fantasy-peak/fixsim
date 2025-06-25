@@ -8,6 +8,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 
@@ -168,7 +169,42 @@ void Application::toApp(FIX::Message &message, const FIX::SessionID &) {
     }
 }
 
-void Application::fromAdmin(const FIX::Message &, const FIX::SessionID &) {}
+asio::awaitable<void> Application::sendCustomizeLoginResponse(
+    FIX::Message msg, FIX::SessionID id) {
+    SPDLOG_INFO("sendCustomizeLoginResponse: [{}]", id.toString());
+    auto message = std::make_shared<FIX::Message>();
+    message->getHeader().setField(
+        FIX::MsgType(m_cfg.logon_response.value().msgtype));
+    for (auto &[id, value] : m_cfg.logon_response.value().reply) {
+        fillExecReport(message, msg, id, value);
+    }
+    FIX::Session::sendToTarget(*message, id);
+    co_return;
+}
+
+void Application::fromAdmin(const FIX::Message &msg, const FIX::SessionID &id) {
+    try {
+        FIX::MsgType msgType;
+        msg.getHeader().getField(msgType);
+        if (msgType == FIX::MsgType_Logon && m_cfg.logon_response.has_value()) {
+            asio::co_spawn(*m_io_ctx, sendCustomizeLoginResponse(msg, id),
+                           [](std::exception_ptr ep) {
+                               if (ep) {
+                                   try {
+                                       std::rethrow_exception(ep);
+                                   } catch (const std::exception &e) {
+                                       SPDLOG_ERROR(
+                                           "fromAdmin Caught exception in "
+                                           "completion handler: {}",
+                                           e.what());
+                                   }
+                               }
+                           });
+        }
+    } catch (const std::exception &e) {
+        SPDLOG_ERROR("{}", e.what());
+    }
+}
 
 void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
     try {

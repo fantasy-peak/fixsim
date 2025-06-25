@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <thread>
@@ -80,6 +81,12 @@ struct Reply {
 YCS_ADD_STRUCT(Reply, check_condition_header, check_condition_body,
                check_cl_order_id, default_reply_flow, symbols_reply_flow)
 
+struct LogonResponse {
+    std::string msgtype;
+    FixFieldMap reply;
+};
+YCS_ADD_STRUCT(LogonResponse, msgtype, reply)
+
 struct Config {
     FixVersion fix_version;
     std::string http_server_host;
@@ -88,12 +95,13 @@ struct Config {
     std::string fix_ini;
     std::chrono::microseconds stress_interval;
     std::vector<TradingSessionStatus> trading_session_status;
+    std::optional<LogonResponse> logon_response;
     std::optional<FixFieldMap> header;
     std::vector<Reply> custom_reply;
 };
 YCS_ADD_STRUCT(Config, fix_version, http_server_host, http_server_port,
                interval, fix_ini, stress_interval, trading_session_status,
-               header, custom_reply)
+               logon_response, header, custom_reply)
 
 class Application : public FIX::Application {
 public:
@@ -127,6 +135,8 @@ private:
     std::string createUniqueOrderID(const FIX::Message &);
     void fillExecReport(std::shared_ptr<FIX::Message> &, const FIX::Message &,
                         int, const std::string &);
+    asio::awaitable<void> sendCustomizeLoginResponse(FIX::Message,
+                                                     FIX::SessionID);
 
     std::shared_ptr<asio::io_context> m_io_ctx;
     Config m_cfg;

@@ -57,6 +57,10 @@
    <field name='EncodedTextLen' required='N' />
    <field name='EncodedText' required='N' />
   </message>
+  <message name='LoginOK' msgtype='U9' msgcat='app'>
+    <field name='EncryptMethod' required='Y'/>
+    <field name='HeartBtInt' required='Y'/>
+  </message>
   <message name='IOI' msgtype='6' msgcat='app'>
    <field name='IOIid' required='Y' />
    <field name='IOITransType' required='Y' />
