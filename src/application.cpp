@@ -97,6 +97,15 @@ std::string getTzDateTime(std::string_view fmt = "{:%Y%m%d-%H:%M:%S}") {
     return std::vformat(fmt, std::make_format_args(zt));
 }
 
+std::string getTzDateTimeNoMs(std::string_view fmt = "{:%Y%m%d-%H:%M:%S}") {
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    auto now_ms = time_point_cast<seconds>(now);
+    auto tz = locate_zone("UTC");
+    zoned_time zt{tz, now_ms};
+    return std::vformat(fmt, std::make_format_args(zt));
+}
+
 std::string uuid() {
     uuid_t uuid;
     char uuid_str[37]{};
@@ -393,6 +402,8 @@ void Application::fillExecReport(std::shared_ptr<FIX::Message> &message,
             setField(*message, field, increment());
         } else if (func_name == "createUniqueOrderID") {
             setField(*message, field, createUniqueOrderID(msg));
+        } else if (func_name == "getTzDateTimeNoMs") {
+            setField(*message, field, getTzDateTimeNoMs());
         } else {
             SPDLOG_ERROR("Unrecognized: {}", value);
         }
