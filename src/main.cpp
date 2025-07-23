@@ -3,6 +3,7 @@
 #include <string>
 #include <utility>
 
+#include <quickfix/Exceptions.h>
 #include <quickfix/FileLog.h>
 #include <quickfix/FileStore.h>
 #include <quickfix/Log.h>
@@ -260,7 +261,6 @@ int main(int argc, char **argv) {
 
         Application application(io_context, cfg.value());
         application.parseXml(dict_file);
-        application.startHttpServer();
 
         FIX::FileStoreFactory store_factory(settings);
         SimFileLogFactory log_factory(settings);
@@ -268,6 +268,8 @@ int main(int argc, char **argv) {
         auto acceptor = std::make_unique<FIX::SocketAcceptor>(
             application, store_factory, settings, log_factory);
         acceptor->start();
+
+        application.startHttpServer();
 
         sig.async_wait([&](const asio::error_code &, int) {
             SPDLOG_INFO("stop...");
