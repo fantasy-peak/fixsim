@@ -128,7 +128,7 @@ private:
     void send(const FIX::SessionID &, const FixFieldMap &, const FixFieldMap &,
               const FIX::Message &, MsgType);
     asio::awaitable<void> loopTimer();
-    asio::awaitable<void> startStress(std::vector<std::string>);
+    asio::awaitable<void> startStress(std::vector<std::string>, std::string);
     asio::awaitable<void> sendTss(FIX::SessionID);
     void setField(FIX::Message &, int tag, const std::string &value);
     asio::awaitable<void> clear();

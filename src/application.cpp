@@ -623,15 +623,26 @@ void Application::startHttpServer() {
         "/stress", [this](const httplib::Request &req, httplib::Response &res) {
             try {
                 auto stress_data = spilt(req.body, '\n');
+                if (!stress_data.empty() && stress_data.back().empty()) {
+                    stress_data.pop_back();
+                }
                 SPDLOG_INFO("csv size: {}", stress_data.size());
+                if (stress_data.empty())
+                    return;
                 if (req.has_header("auto_exit") &&
                     req.get_header_value("auto_exit") == "true") {
                     m_close_stress.store(true);
                 } else {
                     m_close_stress.store(false);
                 }
-                asio::co_spawn(*m_io_ctx, startStress(std::move(stress_data)),
-                               asio::detached);
+                std::string create_time_func = "getTzDateTime";
+                if (req.has_header("create_time_func")) {
+                    create_time_func = req.get_header_value("create_time_func");
+                }
+                asio::co_spawn(
+                    *m_io_ctx,
+                    startStress(std::move(stress_data), create_time_func),
+                    asio::detached);
             } catch (const std::exception &e) {
                 SPDLOG_ERROR("{}", e.what());
                 res.status = 400;
@@ -662,7 +673,8 @@ void Application::stopHttpServer() {
     m_pool.join();
 }
 
-asio::awaitable<void> Application::startStress(std::vector<std::string> csv) {
+asio::awaitable<void> Application::startStress(std::vector<std::string> csv,
+                                               std::string create_time_func) {
     if (csv.empty())
         co_return;
     asio::steady_timer timer(m_pool);
@@ -686,15 +698,23 @@ asio::awaitable<void> Application::startStress(std::vector<std::string> csv) {
             co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
         if (ec)
             break;
+        bool flag = ("getTzDateTime" == create_time_func ? true : false);
         for (const auto &fix_fields : vec_fix_fields) {
             auto exec_report = createExecutionReport();
-            exec_report->setField(FIX::FIELD::TransactTime, getTzDateTime());
+            if (flag) {
+                exec_report->setField(FIX::FIELD::TransactTime,
+                                      getTzDateTime());
+            } else {
+                exec_report->setField(FIX::FIELD::TransactTime,
+                                      getTzDateTimeNoMs());
+            }
             for (auto &[tag, value] : fix_fields) {
-                if (tag == FIX::FIELD::ExecID)
+                if (tag == FIX::FIELD::ExecID) {
                     exec_report->setField(
                         tag, std::format("fixsim.execid.{}", count++));
-                else
+                } else {
                     exec_report->setField(tag, value);
+                }
             }
             try {
                 if (m_session && m_session->isLoggedOn()) {

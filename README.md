@@ -52,7 +52,7 @@ curl -X POST http://127.0.0.1:2025/pause -d '{"flag": false }' -v
 ### open stress test
 ```
 curl -X POST http://127.0.0.1:2025/stress  --data-binary "@data.csv" -H "Content-Type: text/csv"
-curl -H  "auto_exit: true" -X POST http://127.0.0.1:2025/stress  --data-binary "@data.csv" -H "Content-Type: text/csv"
+curl -H "create_time_func: getTzDateTimeNoMs" -H  "auto_exit: true" -X POST http://127.0.0.1:2025/stress  --data-binary "@data.csv" -H "Content-Type: text/csv"
 ```
 ### 2. close stress test
 ```
