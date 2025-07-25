@@ -51,7 +51,8 @@ curl -X POST http://127.0.0.1:2025/pause -d '{"flag": false }' -v
 ## Stress test
 ### open stress test
 ```
-curl -X POST http://127.0.0.1:2025/stress  --data-binary "@a.csv" -H "Content-Type: text/csv"
+curl -X POST http://127.0.0.1:2025/stress  --data-binary "@data.csv" -H "Content-Type: text/csv"
+curl -H  "auto_exit: true" -X POST http://127.0.0.1:2025/stress  --data-binary "@data.csv" -H "Content-Type: text/csv"
 ```
 ### 2. close stress test
 ```

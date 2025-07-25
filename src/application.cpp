@@ -624,7 +624,12 @@ void Application::startHttpServer() {
             try {
                 auto stress_data = spilt(req.body, '\n');
                 SPDLOG_INFO("csv size: {}", stress_data.size());
-                m_close_stress.store(false);
+                if (req.has_header("auto_exit") &&
+                    req.get_header_value("auto_exit") == "true") {
+                    m_close_stress.store(true);
+                } else {
+                    m_close_stress.store(false);
+                }
                 asio::co_spawn(*m_io_ctx, startStress(std::move(stress_data)),
                                asio::detached);
             } catch (const std::exception &e) {
@@ -681,24 +686,29 @@ asio::awaitable<void> Application::startStress(std::vector<std::string> csv) {
             co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
         if (ec)
             break;
-        if (m_close_stress.load(std::memory_order::relaxed)) {
-            break;
-        }
         for (const auto &fix_fields : vec_fix_fields) {
             auto exec_report = createExecutionReport();
             exec_report->setField(FIX::FIELD::TransactTime, getTzDateTime());
             for (auto &[tag, value] : fix_fields) {
                 if (tag == FIX::FIELD::ExecID)
-                    exec_report->setField(tag, std::to_string(count++));
+                    exec_report->setField(
+                        tag, std::format("fixsim.execid.{}", count++));
                 else
                     exec_report->setField(tag, value);
             }
             try {
-                if (m_session)
+                if (m_session && m_session->isLoggedOn()) {
                     m_session->send(*exec_report);
+                } else {
+                    SPDLOG_ERROR("The client did not login, so terminal test");
+                    break;
+                }
             } catch (const std::exception &e) {
                 SPDLOG_ERROR("{}", e.what());
             }
+        }
+        if (m_close_stress.load(std::memory_order::relaxed)) {
+            break;
         }
     }
     co_return;
