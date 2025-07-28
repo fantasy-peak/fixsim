@@ -692,30 +692,33 @@ asio::awaitable<void> Application::startStress(std::vector<std::string> csv,
         }
         vec_fix_fields.emplace_back(std::move(fix_fields));
     }
+    std::vector<std::shared_ptr<FIX::Message>> report;
+    bool flag = ("getTzDateTime" == create_time_func ? true : false);
+    for (const auto &fix_fields : vec_fix_fields) {
+        auto exec_report = createExecutionReport();
+        if (flag) {
+            exec_report->setField(FIX::FIELD::TransactTime, getTzDateTime());
+        } else {
+            exec_report->setField(FIX::FIELD::TransactTime,
+                                  getTzDateTimeNoMs());
+        }
+        for (auto &[tag, value] : fix_fields) {
+            if (tag == FIX::FIELD::ExecID) {
+                exec_report->setField(tag,
+                                      std::format("fixsim.execid.{}", count++));
+            } else {
+                exec_report->setField(tag, value);
+            }
+        }
+        report.emplace_back(std::move(exec_report));
+    }
     for (;;) {
         timer.expires_after(m_cfg.stress_interval);
         auto [ec] =
             co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
         if (ec)
             break;
-        bool flag = ("getTzDateTime" == create_time_func ? true : false);
-        for (const auto &fix_fields : vec_fix_fields) {
-            auto exec_report = createExecutionReport();
-            if (flag) {
-                exec_report->setField(FIX::FIELD::TransactTime,
-                                      getTzDateTime());
-            } else {
-                exec_report->setField(FIX::FIELD::TransactTime,
-                                      getTzDateTimeNoMs());
-            }
-            for (auto &[tag, value] : fix_fields) {
-                if (tag == FIX::FIELD::ExecID) {
-                    exec_report->setField(
-                        tag, std::format("fixsim.execid.{}", count++));
-                } else {
-                    exec_report->setField(tag, value);
-                }
-            }
+        for (auto &exec_report : report) {
             try {
                 if (m_session && m_session->isLoggedOn()) {
                     m_session->send(*exec_report);
@@ -725,6 +728,7 @@ asio::awaitable<void> Application::startStress(std::vector<std::string> csv,
                 }
             } catch (const std::exception &e) {
                 SPDLOG_ERROR("{}", e.what());
+                break;
             }
         }
         if (m_close_stress.load(std::memory_order::relaxed)) {
