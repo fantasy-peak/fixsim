@@ -138,8 +138,9 @@ Application::Application(std::shared_ptr<asio::io_context> ctx,
 
 void Application::onCreate(const FIX::SessionID &id) {
     SPDLOG_INFO("onCreate: [{}]", id.toString());
-    asio::post(m_pool,
-               [this, id] { m_session = FIX::Session::lookupSession(id); });
+    asio::post(m_pool, [this, id] {
+        m_sessions.emplace(id.toString(), FIX::Session::lookupSession(id));
+    });
 }
 
 void Application::onLogon(const FIX::SessionID &id) {
@@ -712,6 +713,12 @@ asio::awaitable<void> Application::startStress(std::vector<std::string> csv,
         }
         report.emplace_back(std::move(exec_report));
     }
+    if (!std::ranges::all_of(m_sessions, [](const auto &data) {
+            auto &[id, session] = data;
+            return session && session->isLoggedOn();
+        })) {
+        SPDLOG_ERROR("no logged in session");
+    }
     for (;;) {
         timer.expires_after(m_cfg.stress_interval);
         auto [ec] =
@@ -720,11 +727,10 @@ asio::awaitable<void> Application::startStress(std::vector<std::string> csv,
             break;
         for (auto &exec_report : report) {
             try {
-                if (m_session && m_session->isLoggedOn()) {
-                    m_session->send(*exec_report);
-                } else {
-                    SPDLOG_ERROR("The client did not login, so terminal test");
-                    break;
+                for (auto &[id, session] : m_sessions) {
+                    if (session && session->isLoggedOn()) {
+                        session->send(*exec_report);
+                    }
                 }
             } catch (const std::exception &e) {
                 SPDLOG_ERROR("{}", e.what());

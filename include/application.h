@@ -141,7 +141,7 @@ private:
     std::shared_ptr<asio::io_context> m_io_ctx;
     Config m_cfg;
     asio::thread_pool m_pool{1};
-    FIX::Session *m_session{nullptr};
+    std::unordered_map<std::string, FIX::Session *> m_sessions;
 
     struct TimedData {
         FIX::SessionID id;
