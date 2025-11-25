@@ -51,12 +51,27 @@ struct TradingSessionStatus {
 };
 YCS_ADD_STRUCT(TradingSessionStatus, reply, interval)
 
+struct MessageOrder {
+    int32_t field;
+    std::string value;
+};
+YCS_ADD_STRUCT(MessageOrder, field, value)
+
+struct Group {
+    int group_count;
+    int32_t group_tag;
+    int32_t first_field;
+    std::vector<MessageOrder> message_order;
+};
+YCS_ADD_STRUCT(Group, group_count, group_tag, first_field, message_order)
+
 struct ReplyData {
     FixFieldMap reply;
     int32_t interval;
     MsgType msg_type;
+    std::optional<std::vector<Group>> groups;
 };
-YCS_ADD_STRUCT(ReplyData, reply, interval, msg_type)
+YCS_ADD_STRUCT(ReplyData, reply, interval, msg_type, groups)
 
 struct SymbolsReplyData {
     FixFieldMap common_fields;
@@ -119,6 +134,8 @@ public:
     void startHttpServer();
     void stopHttpServer();
 
+    std::string createUniqueOrderID(const FIX::Message &);
+
 private:
     void addTimedTask(const FIX::SessionID &, std::vector<ReplyData> &,
                       FixFieldMap &, const std::shared_ptr<FIX::Message> &);
@@ -126,15 +143,12 @@ private:
     std::shared_ptr<FIX::Message> createOrderCancelReject();
     std::shared_ptr<FIX::Message> createTradingSessionStatus();
     void send(const FIX::SessionID &, const FixFieldMap &, const FixFieldMap &,
-              const FIX::Message &, MsgType);
+              const FIX::Message &, MsgType, const std::vector<Group> &);
     asio::awaitable<void> loopTimer();
     asio::awaitable<void> startStress(std::vector<std::string>, std::string);
     asio::awaitable<void> sendTss(FIX::SessionID);
-    void setField(FIX::Message &, int tag, const std::string &value);
     asio::awaitable<void> clear();
-    std::string createUniqueOrderID(const FIX::Message &);
-    void fillExecReport(std::shared_ptr<FIX::Message> &, const FIX::Message &,
-                        int, const std::string &);
+
     asio::awaitable<void> sendCustomizeLoginResponse(FIX::Message,
                                                      FIX::SessionID);
 
@@ -149,6 +163,7 @@ private:
         FixFieldMap *common_fix_fields;
         std::shared_ptr<FIX::Message> msg;
         MsgType msg_type;
+        std::vector<Group> *groups;
     };
 
     std::multimap<std::chrono::system_clock::time_point, TimedData> m_timed;

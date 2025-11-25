@@ -40,6 +40,7 @@
 #include <asio/as_tuple.hpp>
 #include <asio/post.hpp>
 #include <pugixml.hpp>
+#include <vector>
 
 #include "application.h"
 
@@ -127,6 +128,59 @@ std::string increment() {
     return std::to_string(init_value.fetch_add(1, std::memory_order::relaxed));
 }
 
+template <typename T>
+void setField(T &message, int tag, const std::string &value) {
+    if (value == "bool:true" || value == "bool:false") {
+        FIX::BoolField field(tag, value == "bool:true" ? true : false);
+        message.setField(field);
+    } else {
+        message.setField(tag, value);
+    }
+}
+
+template <typename T, typename A>
+void fillExecReport(T &message, const FIX::Message &msg, int field,
+                    const std::string &value, A self) {
+    if (value.starts_with("input.")) {
+        auto val = getValue(value);
+        setField(*message, field, msg.getField(std::stoi(val)));
+    } else if (value.starts_with("if_input.")) {
+        auto val = getValue(value);
+        auto field = std::stoi(val);
+        if (msg.isSetField(field)) {
+            setField(*message, field, msg.getField(field));
+        }
+    } else if (value.starts_with("input_header.")) {
+        auto val = getValue(value);
+        setField(*message, field, msg.getHeader().getField(std::stoi(val)));
+    } else if (value.starts_with("if_input_header.")) {
+        auto val = getValue(value);
+        auto field = std::stoi(val);
+        if (msg.getHeader().isSetField(field)) {
+            setField(*message, field, msg.getHeader().getField(field));
+        }
+    } else if (value.starts_with("call.")) {
+        auto func_name = getValue(value);
+        if (func_name == "uuid") {
+            setField(*message, field, uuid());
+        } else if (func_name == "getTzDateTime") {
+            setField(*message, field, getTzDateTime());
+        } else if (func_name == "randomNumber") {
+            setField(*message, field, randomNumber());
+        } else if (func_name == "increment") {
+            setField(*message, field, increment());
+        } else if (func_name == "createUniqueOrderID") {
+            setField(*message, field, self->createUniqueOrderID(msg));
+        } else if (func_name == "getTzDateTimeNoMs") {
+            setField(*message, field, getTzDateTimeNoMs());
+        } else {
+            SPDLOG_ERROR("Unrecognized: {}", value);
+        }
+    } else {
+        setField(*message, field, value);
+    }
+}
+
 }  // namespace
 
 Application::Application(std::shared_ptr<asio::io_context> ctx,
@@ -186,7 +240,7 @@ asio::awaitable<void> Application::sendCustomizeLoginResponse(
     message->getHeader().setField(
         FIX::MsgType(m_cfg.logon_response.value().msgtype));
     for (auto &[id, value] : m_cfg.logon_response.value().reply) {
-        fillExecReport(message, msg, id, value);
+        fillExecReport(message, msg, id, value, this);
     }
     FIX::Session::sendToTarget(*message, id);
     co_return;
@@ -218,6 +272,8 @@ void Application::fromAdmin(const FIX::Message &msg, const FIX::SessionID &id) {
 
 void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
     try {
+        auto &no_msg_types = msg.groups().at(FIX::FIELD::NoMsgTypes);
+
         for (auto &[check_cond_header, check_cond_body, check_cl_order_id,
                     default_reply_flow, symbols_reply_flow] :
              m_cfg.custom_reply) {
@@ -263,8 +319,9 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
                             !result.second) {
                             SPDLOG_INFO("duplicated order: {}", cl_ord_id);
                             static FixFieldMap map;
+                            static std::vector<Group> groups;
                             send(id, check_cl_order_id, map, *msg_ptr,
-                                 MsgType::ExecutionReport);
+                                 MsgType::ExecutionReport, groups);
                             return;
                         }
                     }
@@ -302,18 +359,23 @@ void Application::addTimedTask(const FIX::SessionID &id,
                                FixFieldMap &common_fix_fields,
                                const std::shared_ptr<FIX::Message> &msg_ptr) {
     std::chrono::milliseconds dut{0};
-    for (auto &[fix_fields, interval, msg_type] : reply_flow) {
+    static std::vector<Group> default_groups;
+    for (auto &[fix_fields, interval, msg_type, groups] : reply_flow) {
         if (interval < 0) {
-            send(id, fix_fields, common_fix_fields, *msg_ptr, msg_type);
+            send(id, fix_fields, common_fix_fields, *msg_ptr, msg_type,
+                 groups.has_value() ? groups.value() : default_groups);
         } else {
             dut += std::chrono::milliseconds{interval};
             auto expiry = std::chrono::system_clock::now() + dut;
-            m_timed.emplace(expiry,
-                            TimedData{.id = id,
-                                      .fix_fields = &fix_fields,
-                                      .common_fix_fields = &common_fix_fields,
-                                      .msg = msg_ptr,
-                                      .msg_type = msg_type});
+            m_timed.emplace(
+                expiry,
+                TimedData{.id = id,
+                          .fix_fields = &fix_fields,
+                          .common_fix_fields = &common_fix_fields,
+                          .msg = msg_ptr,
+                          .msg_type = msg_type,
+                          .groups = groups.has_value() ? &groups.value()
+                                                       : &default_groups});
         }
     }
 }
@@ -360,62 +422,10 @@ std::shared_ptr<FIX::Message> Application::createTradingSessionStatus() {
     throw std::runtime_error("Unsupported FIX version");
 }
 
-void Application::setField(FIX::Message &message, int tag,
-                           const std::string &value) {
-    if (value == "bool:true" || value == "bool:false") {
-        FIX::BoolField field(tag, value == "bool:true" ? true : false);
-        message.setField(field);
-    } else {
-        message.setField(tag, value);
-    }
-}
-
-void Application::fillExecReport(std::shared_ptr<FIX::Message> &message,
-                                 const FIX::Message &msg, int field,
-                                 const std::string &value) {
-    if (value.starts_with("input.")) {
-        auto val = getValue(value);
-        setField(*message, field, msg.getField(std::stoi(val)));
-    } else if (value.starts_with("if_input.")) {
-        auto val = getValue(value);
-        auto field = std::stoi(val);
-        if (msg.isSetField(field)) {
-            setField(*message, field, msg.getField(field));
-        }
-    } else if (value.starts_with("input_header.")) {
-        auto val = getValue(value);
-        setField(*message, field, msg.getHeader().getField(std::stoi(val)));
-    } else if (value.starts_with("if_input_header.")) {
-        auto val = getValue(value);
-        auto field = std::stoi(val);
-        if (msg.getHeader().isSetField(field)) {
-            setField(*message, field, msg.getHeader().getField(field));
-        }
-    } else if (value.starts_with("call.")) {
-        auto func_name = getValue(value);
-        if (func_name == "uuid") {
-            setField(*message, field, uuid());
-        } else if (func_name == "getTzDateTime") {
-            setField(*message, field, getTzDateTime());
-        } else if (func_name == "randomNumber") {
-            setField(*message, field, randomNumber());
-        } else if (func_name == "increment") {
-            setField(*message, field, increment());
-        } else if (func_name == "createUniqueOrderID") {
-            setField(*message, field, createUniqueOrderID(msg));
-        } else if (func_name == "getTzDateTimeNoMs") {
-            setField(*message, field, getTzDateTimeNoMs());
-        } else {
-            SPDLOG_ERROR("Unrecognized: {}", value);
-        }
-    } else {
-        setField(*message, field, value);
-    }
-}
-
 void Application::send(const FIX::SessionID &id, const FixFieldMap &fix_fields,
                        const FixFieldMap &common_fix_fields,
-                       const FIX::Message &msg, MsgType msg_type) {
+                       const FIX::Message &msg, MsgType msg_type,
+                       const std::vector<Group> &groups) {
     try {
         std::shared_ptr<FIX::Message> message;
         if (msg_type == MsgType::ExecutionReport)
@@ -423,10 +433,28 @@ void Application::send(const FIX::SessionID &id, const FixFieldMap &fix_fields,
         else
             message = createOrderCancelReject();
         for (const auto &[field, value] : common_fix_fields) {
-            fillExecReport(message, msg, field, value);
+            fillExecReport(message, msg, field, value, this);
         }
         for (const auto &[field, value] : fix_fields) {
-            fillExecReport(message, msg, field, value);
+            fillExecReport(message, msg, field, value, this);
+        }
+        for (const auto &group : groups) {
+            auto fields =
+                group.message_order |
+                std::views::transform([](auto &data) { return data.field; }) |
+                to<std::vector<int>>();
+            auto &[group_count, group_tag, first_field, message_order] = group;
+            message->setField(FIX::IntField(group_tag, group_count));
+            FIX::message_order field_order{fields.data(),
+                                           static_cast<int>(fields.size())};
+            for (int i = 0; i < group_count; i++) {
+                auto group = std::make_shared<FIX::Group>(
+                    group_tag, first_field, field_order);
+                for (const auto &[field, value] : message_order) {
+                    fillExecReport(group, msg, field, value, this);
+                }
+                message->addGroup(*group);
+            }
         }
         FIX::Session::sendToTarget(*message, id);
     } catch (const std::exception &e) {
@@ -469,8 +497,9 @@ asio::awaitable<void> Application::loopTimer() {
         while (!m_timed.empty() && m_timed.begin()->first <= now) {
             auto data = std::move(m_timed.begin()->second);
             m_timed.erase(m_timed.begin());
-            auto &[id, fix_fields, common_fix_fields, msg, msg_type] = data;
-            send(id, *fix_fields, *common_fix_fields, *msg, msg_type);
+            auto &[id, fix_fields, common_fix_fields, msg, msg_type, groups] =
+                data;
+            send(id, *fix_fields, *common_fix_fields, *msg, msg_type, *groups);
         }
     }
 }

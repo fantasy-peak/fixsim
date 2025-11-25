@@ -1,0 +1,52 @@
+http_server_host: "0.0.0.0"
+http_server_port: 2025
+interval: 100 # check message interval 100 ms
+fix_ini: ./cfg/fix.ini
+fix_version: "FIX42"
+stress_interval: 100000 # microsecond
+
+trading_session_status:
+  - interval: -1
+    reply:
+      340: "2" # open
+      336: "TradingSessionID"
+  - interval: 5000
+    reply:
+      340: "3" # close
+      336: "TradingSessionID"
+
+custom_reply:
+  - check_condition_header:
+      35: "D" # new order
+    check_condition_body:
+      40: "2" # Limit
+    check_cl_order_id: {}
+    default_reply_flow:
+      common_fields:
+        17: "call.uuid" # Call the built-in uuid function
+        37: "call.createUniqueOrderID" # It will generate OrderID associated with input.11
+        54: "input.54"
+        55: "input.55"
+        60: "call.getTzDateTime" # Call the built-in getTzDateTime function
+      reply_flow:
+        - interval: 1000
+          msg_type: "ExecutionReport"
+          reply:
+            39: "0" # accept
+            20: "0"
+            150: "0" # ExecType
+          groups:
+            - group_count: 1
+              group_tag: 22040
+              first_field: 1
+              message_order:
+                - field: 1
+                  value: "account123"
+                - field: 60
+                  value: "20251125"
+                - field: 55
+                  value: "input.55"
+    symbols_reply_flow:
+      - symbols: []
+        common_fields: {}
+        reply_flow: []
