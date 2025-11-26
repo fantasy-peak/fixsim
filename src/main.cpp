@@ -238,6 +238,7 @@ void SimFileLogFactory::destroy(FIX::Log *pLog) {
 int main(int argc, char **argv) {
     try {
         spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e][thread %t][%s:%#][%l] %v");
+        SPDLOG_INFO("VERSION: {}, BUILD DATE: {}", APP_VERSION, APP_DATE);
         auto [cfg, error] = yaml_cpp_struct::from_yaml<Config>(argv[1]);
         if (!cfg) {
             SPDLOG_ERROR("{}", error);
@@ -254,6 +255,12 @@ int main(int argc, char **argv) {
         auto io_context = std::make_shared<asio::io_context>();
         asio::signal_set sig(*io_context, SIGINT, SIGTERM);
         SPDLOG_INFO("\n{}", str.value());
+
+        std::filesystem::path fix_ini_path = cfg.value().fix_ini;
+        if (!std::filesystem::exists(fix_ini_path)) {
+            SPDLOG_INFO("{} not exists", fix_ini_path.string());
+            return 1;
+        }
 
         FIX::SessionSettings settings(cfg.value().fix_ini);
         auto dict_file = settings.get().getString(FIX::DATA_DICTIONARY);
