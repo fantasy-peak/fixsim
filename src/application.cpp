@@ -443,6 +443,7 @@ asio::awaitable<void> Application::sendTss(FIX::SessionID id) {
         }
         if (interval < 0) {
             FIX::Session::sendToTarget(*message, id);
+            SPDLOG_INFO("send [{}] Tss done", id.toString());
             continue;
         }
         timer.expires_after(std::chrono::milliseconds(interval));
@@ -450,6 +451,7 @@ asio::awaitable<void> Application::sendTss(FIX::SessionID id) {
             co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
         if (ec)
             break;
+        SPDLOG_INFO("send [{}] Tss done", id.toString());
         FIX::Session::sendToTarget(*message, id);
     }
 }
