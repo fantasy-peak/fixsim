@@ -660,6 +660,42 @@ void Application::startHttpServer() {
         SPDLOG_INFO("close stress: {}", m_close_stress ? "true" : "false");
         res.set_content("success!\n", "text/plain");
     });
+    http_server->Post("/send/fix/response", [this](const httplib::Request &req,
+                                                   httplib::Response &res) {
+        try {
+            auto fix_rsp_data = spilt(req.body, '\n');
+            if (!fix_rsp_data.empty() && fix_rsp_data.back().empty()) {
+                fix_rsp_data.pop_back();
+            }
+            int64_t interval = 0;
+            if (req.has_header("interval")) {
+                interval = std::stol(req.get_header_value("interval"));
+            }
+            SPDLOG_INFO("fix_rsp_data size: {}, interval: {}",
+                        fix_rsp_data.size(), interval);
+            for (auto &str : fix_rsp_data) {
+                std::ranges::replace(str, '|', '\001');
+                FIX::Message msg{str};
+                asio::post(*m_io_ctx, [this, msg = std::move(msg)] mutable {
+                    for (auto &[id, session] : m_sessions) {
+                        if (session && session->isLoggedOn()) {
+                            session->send(msg);
+                        }
+                    }
+                });
+                if (interval > 0) {
+                    std::this_thread::sleep_for(
+                        std::chrono::milliseconds(interval));
+                }
+            }
+        } catch (const std::exception &e) {
+            SPDLOG_ERROR("{}", e.what());
+            res.status = 400;
+            res.set_content("invalid request", "text/plain");
+            return;
+        }
+        res.set_content("success!\n", "text/plain");
+    });
     m_thread = std::thread([http_server, this] {
         SPDLOG_INFO("start http server at {}:{}", m_cfg.http_server_host,
                     m_cfg.http_server_port);

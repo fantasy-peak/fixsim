@@ -58,6 +58,10 @@ curl -H "create_time_func: getTzDateTimeNoMs" -H  "auto_exit: true" -X POST http
 ```
 curl http://127.0.0.1:2025/close/stress
 ```
+### 3. send custom response
+```
+curl -H 'interval: 10' -X POST http://127.0.0.1:2025/send/fix/response -v --data-binary "@rsp.txt" -H "Content-Type: text/plain"
+```
 
 ## How to write configuration files
 ### 1. Query new order format
