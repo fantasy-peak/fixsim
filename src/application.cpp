@@ -190,13 +190,24 @@ Application::Application(std::shared_ptr<asio::io_context> ctx,
 
 void Application::onCreate(const FIX::SessionID &id) {
     SPDLOG_INFO("onCreate: [{}]", id.toString());
-    asio::post(m_pool, [this, id] {
+    asio::post(*m_io_ctx, [this, id] {
         m_sessions.emplace(id.toString(), FIX::Session::lookupSession(id));
     });
 }
 
 void Application::onLogon(const FIX::SessionID &id) {
     SPDLOG_INFO("onLogon: [{}]", id.toString());
+    asio::post(*m_io_ctx, [this, id] {
+        if (!m_cfg.push_jobs.has_value()) {
+            return;
+        }
+        for (auto &push_job : m_cfg.push_jobs.value()) {
+            auto timer = std::make_shared<asio::steady_timer>(*m_io_ctx);
+            asio::co_spawn(*m_io_ctx, startPushJob(id, push_job, timer),
+                           asio::detached);
+            m_push_jobs[id.toString()].push_back(timer);
+        }
+    });
     if (m_cfg.trading_session_status.empty())
         return;
     SPDLOG_INFO("start send Tss: [{}]", id.toString());
@@ -214,6 +225,15 @@ void Application::onLogon(const FIX::SessionID &id) {
 
 void Application::onLogout(const FIX::SessionID &id) {
     SPDLOG_INFO("onLogout: [{}]", id.toString());
+    asio::post(*m_io_ctx, [this, id] {
+        auto it = m_push_jobs.find(id.toString());
+        if (it != m_push_jobs.end()) {
+            for (auto &timer : it->second) {
+                timer->cancel();
+            }
+            m_push_jobs.erase(it);
+        }
+    });
 }
 
 void Application::toAdmin(FIX::Message &, const FIX::SessionID &) {}
@@ -482,6 +502,32 @@ asio::awaitable<void> Application::sendTss(FIX::SessionID id) {
     }
 }
 
+asio::awaitable<void> Application::startPushJob(
+    FIX::SessionID id, PushJob push_job,
+    std::shared_ptr<asio::steady_timer> timer) {
+    if (push_job.max_push_limit <= 0) {
+        co_return;
+    }
+    SPDLOG_INFO("start [{}] PushJob", push_job.task_id);
+    const static FixFieldMap common_fix_fields;
+    const static FIX::Message msg;
+    const auto &[reply, interval, msg_type, response_groups] = push_job.payload;
+    int count = 0;
+    for (;;) {
+        timer->expires_after(std::chrono::milliseconds(interval));
+        auto [ec] =
+            co_await timer->async_wait(asio::as_tuple(asio::use_awaitable));
+        if (ec)
+            break;
+        send(id, reply, common_fix_fields, response_groups, msg, msg_type);
+        if (++count >= push_job.max_push_limit) {
+            break;
+        }
+    }
+    SPDLOG_INFO("PushJob [{}] done", push_job.task_id);
+    co_return;
+}
+
 asio::awaitable<void> Application::loopTimer() {
     asio::steady_timer timer(*m_io_ctx);
     for (;;) {
@@ -736,15 +782,13 @@ void Application::stopHttpServer() {
     m_stop();
     if (m_thread.joinable())
         m_thread.join();
-    m_pool.stop();
-    m_pool.join();
 }
 
 asio::awaitable<void> Application::startStress(std::vector<std::string> csv,
                                                std::string create_time_func) {
     if (csv.empty())
         co_return;
-    asio::steady_timer timer(m_pool);
+    asio::steady_timer timer(*m_io_ctx);
     uint64_t count = 0;
     std::vector<std::unordered_map<int32_t, std::string>> vec_fix_fields;
     for (const auto &line : csv) {

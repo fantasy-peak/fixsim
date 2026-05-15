@@ -9,6 +9,29 @@ header: { 43: "N" }
 
 trading_session_status: []
 
+push_jobs:
+  - task_id: "test_push_jobs"
+    max_push_limit: 3
+    payload:
+      interval: 3000
+      msg_type: "8"
+      reply:
+        39: "0"
+        20: "0"
+        150: "0"
+        17: "call.uuid"
+        37: "37" 
+        54: "1"
+        55: "USD"
+        60: "call.getTzDateTime" # Call the built-in getTzDateTime function
+      response_groups:
+        - response_group_tag: 22068
+          message_order: [
+            [11, "order"],
+            [55, "symbol"],
+          ]
+          total_no: 2
+
 custom_reply:
   - check_condition_header:
       35: "D" # new order
@@ -36,7 +59,7 @@ custom_reply:
                 [55, "input.55"],
               ]
               total_no: 2
-        - interval: 5000
+        - interval: 1000
           msg_type: "8"
           reply:
             39: "2" # fill

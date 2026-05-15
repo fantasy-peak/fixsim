@@ -89,6 +89,13 @@ struct LogonResponse {
 };
 YCS_ADD_STRUCT(LogonResponse, msgtype, reply)
 
+struct PushJob {
+    std::string task_id;
+    int max_push_limit;
+    ReplyData payload;
+};
+YCS_ADD_STRUCT(PushJob, task_id, max_push_limit, payload)
+
 struct Config {
     FixVersion fix_version;
     std::string http_server_host;
@@ -100,10 +107,11 @@ struct Config {
     std::optional<LogonResponse> logon_response;
     std::optional<FixFieldMap> header;
     std::vector<Reply> custom_reply;
+    std::optional<std::vector<PushJob>> push_jobs;
 };
 YCS_ADD_STRUCT(Config, fix_version, http_server_host, http_server_port,
                interval, fix_ini, stress_interval, trading_session_status,
-               logon_response, header, custom_reply)
+               logon_response, header, custom_reply, push_jobs)
 
 class Application : public FIX::Application {
 public:
@@ -134,6 +142,9 @@ private:
     asio::awaitable<void> startStress(std::vector<std::string>, std::string);
     asio::awaitable<void> sendTss(FIX::SessionID);
     asio::awaitable<void> clear();
+    asio::awaitable<void> startPushJob(
+        FIX::SessionID id, PushJob push_job,
+        std::shared_ptr<asio::steady_timer> timer);
     void fillExecReport(std::shared_ptr<FIX::Message> &, const FIX::Message &,
                         int, const std::string &);
     asio::awaitable<void> sendCustomizeLoginResponse(FIX::Message,
@@ -144,8 +155,10 @@ private:
 
     std::shared_ptr<asio::io_context> m_io_ctx;
     Config m_cfg;
-    asio::thread_pool m_pool{1};
     std::unordered_map<std::string, FIX::Session *> m_sessions;
+    std::unordered_map<std::string,
+                       std::vector<std::shared_ptr<asio::steady_timer>>>
+        m_push_jobs;
 
     struct TimedData {
         FIX::SessionID id;
