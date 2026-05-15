@@ -417,8 +417,7 @@ std::shared_ptr<FIX::Message> Application::createTradingSessionStatus() {
 void Application::addGroup(std::shared_ptr<FIX::Message> &message,
                            const FIX::Message &msg,
                            const FixResponseGroup &fix_response_group) {
-    auto [rsp_group_tag, rsp_first_field, total_no, message_order] =
-        fix_response_group;
+    auto [rsp_group_tag, total_no, message_order] = fix_response_group;
     std::vector<int32_t> fields;
     fields.reserve(message_order.size());
     for (auto &[field, value] : message_order) {
@@ -431,6 +430,7 @@ void Application::addGroup(std::shared_ptr<FIX::Message> &message,
     if (fields.back() != 0) {
         fields.emplace_back(0);
     }
+    auto rsp_first_field = fields[0];
     FIX::message_order rsp_field_order{fields.data(), fields.size()};
     if (total_no <= 0) {
         total_no = 1;

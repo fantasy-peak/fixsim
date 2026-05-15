@@ -47,12 +47,10 @@ YCS_ADD_STRUCT(TradingSessionStatus, reply, interval)
 
 struct FixResponseGroup {
     int32_t response_group_tag;
-    int32_t response_first_field;
     int32_t total_no;
     std::vector<std::tuple<int32_t, std::string>> message_order;
 };
-YCS_ADD_STRUCT(FixResponseGroup, response_group_tag, response_first_field,
-               total_no, message_order)
+YCS_ADD_STRUCT(FixResponseGroup, response_group_tag, total_no, message_order)
 
 struct ReplyData {
     FixFieldMap reply;
@@ -133,7 +131,7 @@ private:
     std::shared_ptr<FIX::Message> createTradingSessionStatus();
     void send(const FIX::SessionID &, const FixFieldMap &, const FixFieldMap &,
               const std::optional<std::vector<FixResponseGroup>> &,
-              const FIX::Message &, const std::string&);
+              const FIX::Message &, const std::string &);
     asio::awaitable<void> loopTimer();
     asio::awaitable<void> startStress(std::vector<std::string>, std::string);
     asio::awaitable<void> sendTss(FIX::SessionID);

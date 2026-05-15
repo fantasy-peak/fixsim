@@ -31,7 +31,6 @@ custom_reply:
             150: "0" # ExecType
           response_groups:
             - response_group_tag: 22068
-              response_first_field: 11
               message_order: [
                 [11, "input.11"],
                 [55, "input.55"],
@@ -45,7 +44,6 @@ custom_reply:
             150: "2" # ExecType
           response_groups:
             - response_group_tag: 22068
-              response_first_field: 11
               message_order: [
                 [11, "input.11"],
                 [55, "input.55"],
