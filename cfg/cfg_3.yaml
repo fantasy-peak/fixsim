@@ -24,7 +24,7 @@ custom_reply:
         60: "call.getTzDateTime" # Call the built-in getTzDateTime function
       reply_flow:
         - interval: 1000
-          msg_type: "ExecutionReport"
+          msg_type: "8"
           reply:
             39: "0" # accept
             20: "0"
@@ -38,7 +38,7 @@ custom_reply:
               ]
               total_no: 2
         - interval: 5000
-          msg_type: "ExecutionReport"
+          msg_type: "8"
           reply:
             39: "2" # fill
             20: "1"

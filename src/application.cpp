@@ -316,7 +316,7 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
                             SPDLOG_INFO("duplicated order: {}", cl_ord_id);
                             static FixFieldMap map;
                             send(id, check_cl_order_id, map, std::nullopt,
-                                 *msg_ptr, MsgType::ExecutionReport);
+                                 *msg_ptr, "ExecutionReport");
                             return;
                         }
                     }
@@ -456,13 +456,17 @@ void Application::send(
     const FIX::SessionID &id, const FixFieldMap &fix_fields,
     const FixFieldMap &common_fix_fields,
     const std::optional<std::vector<FixResponseGroup>> &response_groups,
-    const FIX::Message &msg, MsgType msg_type) {
+    const FIX::Message &msg, const std::string &msg_type) {
     try {
-        std::shared_ptr<FIX::Message> message;
-        if (msg_type == MsgType::ExecutionReport)
-            message = createExecutionReport();
-        else
-            message = createOrderCancelReject();
+        std::shared_ptr<FIX::Message> message =
+            std::make_shared<FIX::Message>();
+        if (msg_type == "ExecutionReport") {
+            message->getHeader().setField(FIX::MsgType("8"));
+        } else if (msg_type == "OrderCancelReject") {
+            message->getHeader().setField(FIX::MsgType("9"));
+        } else {
+            message->getHeader().setField(FIX::MsgType(msg_type));
+        }
         for (const auto &[field, value] : common_fix_fields) {
             fillExecReport(message, msg, field, value);
         }

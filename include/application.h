@@ -29,12 +29,6 @@
 
 using FixFieldMap = std::unordered_map<int32_t, std::string>;
 
-enum class MsgType : uint8_t {
-    ExecutionReport,
-    OrderCancelReject,
-};
-YCS_ADD_ENUM(MsgType, ExecutionReport, OrderCancelReject)
-
 enum class FixVersion : uint8_t {
     FIX40,
     FIX41,
@@ -63,7 +57,7 @@ YCS_ADD_STRUCT(FixResponseGroup, response_group_tag, response_first_field,
 struct ReplyData {
     FixFieldMap reply;
     int32_t interval;
-    MsgType msg_type;
+    std::string msg_type;
     std::optional<std::vector<FixResponseGroup>> response_groups;
 };
 YCS_ADD_STRUCT(ReplyData, reply, interval, msg_type, response_groups)
@@ -130,6 +124,7 @@ public:
     void stopHttpServer();
 
     std::string createUniqueOrderID(const FIX::Message &);
+
 private:
     void addTimedTask(const FIX::SessionID &, std::vector<ReplyData> &,
                       FixFieldMap &, const std::shared_ptr<FIX::Message> &);
@@ -138,7 +133,7 @@ private:
     std::shared_ptr<FIX::Message> createTradingSessionStatus();
     void send(const FIX::SessionID &, const FixFieldMap &, const FixFieldMap &,
               const std::optional<std::vector<FixResponseGroup>> &,
-              const FIX::Message &, MsgType);
+              const FIX::Message &, const std::string&);
     asio::awaitable<void> loopTimer();
     asio::awaitable<void> startStress(std::vector<std::string>, std::string);
     asio::awaitable<void> sendTss(FIX::SessionID);
@@ -161,7 +156,7 @@ private:
         FixFieldMap *fix_fields;
         FixFieldMap *common_fix_fields;
         std::shared_ptr<FIX::Message> msg;
-        MsgType msg_type;
+        std::string msg_type;
         std::optional<std::vector<FixResponseGroup>> response_groups;
     };
 
