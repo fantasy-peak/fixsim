@@ -1,0 +1,55 @@
+http_server_host: "0.0.0.0"
+http_server_port: 2025
+interval: 100 # check message interval 100 ms
+fix_ini: ./cfg/fix_group.ini
+fix_version: "FIX42"
+stress_interval: 100000 # microsecond
+
+header: { 43: "N" }
+
+trading_session_status: []
+
+custom_reply:
+  - check_condition_header:
+      35: "D" # new order
+    check_condition_body:
+      40: "2" # Limit
+    check_cl_order_id: {}
+    default_reply_flow:
+      common_fields:
+        17: "call.uuid" # Call the built-in uuid function
+        37: "input.11" # use new order's 11 field fill it(37)
+        54: "input.54"
+        55: "input.55"
+        60: "call.getTzDateTime" # Call the built-in getTzDateTime function
+      reply_flow:
+        - interval: 1000
+          msg_type: "8"
+          reply:
+            39: "0" # accept
+            20: "0"
+            150: "0" # ExecType
+          response_groups:
+            - response_group_tag: 22068
+              message_order: [
+                [11, "input.11"],
+                [55, "input.55"],
+              ]
+              total_no: 2
+        - interval: 5000
+          msg_type: "8"
+          reply:
+            39: "2" # fill
+            20: "1"
+            150: "2" # ExecType
+          response_groups:
+            - response_group_tag: 22068
+              message_order: [
+                [11, "input.11"],
+                [55, "input.55"],
+              ]
+              total_no: 2
+    symbols_reply_flow:
+      - symbols: []
+        common_fields: {}
+        reply_flow: []

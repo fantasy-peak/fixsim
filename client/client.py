@@ -1,4 +1,5 @@
 import quickfix as fix
+import datetime
 
 class Application(fix.Application):
     def onCreate(self, sessionID): pass
@@ -13,7 +14,10 @@ class Application(fix.Application):
     def toApp(self, message, sessionID): pass
     def fromAdmin(self, message, sessionID): pass
     def fromApp(self, message, sessionID): 
-        print("Received:", message)
+        now = datetime.datetime.now()
+        time_str = now.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        readable_message = str(message).replace('\x01', '|')
+        print(f"[{time_str}] Received: {readable_message}")
 
     def send_order(self):
         order = fix.Message()
@@ -48,7 +52,8 @@ class Application(fix.Application):
         print("Order Sent.")
 
 # 启动客户端
-settings = fix.SessionSettings("./fix.ini")
+settings = fix.SessionSettings("./fix_group.ini")
+print("load ./fix_group.ini")
 app = Application()
 storeFactory = fix.FileStoreFactory(settings)
 logFactory = fix.FileLogFactory(settings)

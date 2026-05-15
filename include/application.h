@@ -29,12 +29,6 @@
 
 using FixFieldMap = std::unordered_map<int32_t, std::string>;
 
-enum class MsgType : uint8_t {
-    ExecutionReport,
-    OrderCancelReject,
-};
-YCS_ADD_ENUM(MsgType, ExecutionReport, OrderCancelReject)
-
 enum class FixVersion : uint8_t {
     FIX40,
     FIX41,
@@ -51,12 +45,20 @@ struct TradingSessionStatus {
 };
 YCS_ADD_STRUCT(TradingSessionStatus, reply, interval)
 
+struct FixResponseGroup {
+    int32_t response_group_tag;
+    int32_t total_no;
+    std::vector<std::tuple<int32_t, std::string>> message_order;
+};
+YCS_ADD_STRUCT(FixResponseGroup, response_group_tag, total_no, message_order)
+
 struct ReplyData {
     FixFieldMap reply;
     int32_t interval;
-    MsgType msg_type;
+    std::string msg_type;
+    std::optional<std::vector<FixResponseGroup>> response_groups;
 };
-YCS_ADD_STRUCT(ReplyData, reply, interval, msg_type)
+YCS_ADD_STRUCT(ReplyData, reply, interval, msg_type, response_groups)
 
 struct SymbolsReplyData {
     FixFieldMap common_fields;
@@ -119,6 +121,8 @@ public:
     void startHttpServer();
     void stopHttpServer();
 
+    std::string createUniqueOrderID(const FIX::Message &);
+
 private:
     void addTimedTask(const FIX::SessionID &, std::vector<ReplyData> &,
                       FixFieldMap &, const std::shared_ptr<FIX::Message> &);
@@ -126,17 +130,19 @@ private:
     std::shared_ptr<FIX::Message> createOrderCancelReject();
     std::shared_ptr<FIX::Message> createTradingSessionStatus();
     void send(const FIX::SessionID &, const FixFieldMap &, const FixFieldMap &,
-              const FIX::Message &, MsgType);
+              const std::optional<std::vector<FixResponseGroup>> &,
+              const FIX::Message &, const std::string &);
     asio::awaitable<void> loopTimer();
     asio::awaitable<void> startStress(std::vector<std::string>, std::string);
     asio::awaitable<void> sendTss(FIX::SessionID);
-    void setField(FIX::Message &, int tag, const std::string &value);
     asio::awaitable<void> clear();
-    std::string createUniqueOrderID(const FIX::Message &);
     void fillExecReport(std::shared_ptr<FIX::Message> &, const FIX::Message &,
                         int, const std::string &);
     asio::awaitable<void> sendCustomizeLoginResponse(FIX::Message,
                                                      FIX::SessionID);
+    void addGroup(std::shared_ptr<FIX::Message> &message,
+                  const FIX::Message &msg,
+                  const FixResponseGroup &fix_response_group);
 
     std::shared_ptr<asio::io_context> m_io_ctx;
     Config m_cfg;
@@ -148,7 +154,8 @@ private:
         FixFieldMap *fix_fields;
         FixFieldMap *common_fix_fields;
         std::shared_ptr<FIX::Message> msg;
-        MsgType msg_type;
+        std::string msg_type;
+        std::optional<std::vector<FixResponseGroup>> response_groups;
     };
 
     std::multimap<std::chrono::system_clock::time_point, TimedData> m_timed;
