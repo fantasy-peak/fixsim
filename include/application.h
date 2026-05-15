@@ -126,8 +126,6 @@ public:
 private:
     void addTimedTask(const FIX::SessionID &, std::vector<ReplyData> &,
                       FixFieldMap &, const std::shared_ptr<FIX::Message> &);
-    std::shared_ptr<FIX::Message> createExecutionReport();
-    std::shared_ptr<FIX::Message> createOrderCancelReject();
     std::shared_ptr<FIX::Message> createTradingSessionStatus();
     void send(const FIX::SessionID &, const FixFieldMap &, const FixFieldMap &,
               const std::optional<std::vector<FixResponseGroup>> &,

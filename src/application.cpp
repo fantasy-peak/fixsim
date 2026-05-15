@@ -372,29 +372,6 @@ void Application::addTimedTask(const FIX::SessionID &id,
     }
 }
 
-#define CREATE_FIX_MESSAGE_BY_VERSION(msg_type)         \
-    switch (m_cfg.fix_version) {                        \
-        case FixVersion::FIX40:                         \
-            return std::make_shared<FIX40::msg_type>(); \
-        case FixVersion::FIX41:                         \
-            return std::make_shared<FIX41::msg_type>(); \
-        case FixVersion::FIX42:                         \
-            return std::make_shared<FIX42::msg_type>(); \
-        case FixVersion::FIX43:                         \
-            return std::make_shared<FIX43::msg_type>(); \
-        case FixVersion::FIX44:                         \
-            return std::make_shared<FIX44::msg_type>(); \
-        case FixVersion::FIX50:                         \
-            return std::make_shared<FIX50::msg_type>(); \
-    }                                                   \
-    throw std::runtime_error("Unsupported FIX version");
-
-std::shared_ptr<FIX::Message> Application::createExecutionReport(){
-    CREATE_FIX_MESSAGE_BY_VERSION(ExecutionReport)}
-
-std::shared_ptr<FIX::Message> Application::createOrderCancelReject(){
-    CREATE_FIX_MESSAGE_BY_VERSION(OrderCancelReject)}
-
 std::shared_ptr<FIX::Message> Application::createTradingSessionStatus() {
     switch (m_cfg.fix_version) {
         case FixVersion::FIX40:
@@ -458,8 +435,7 @@ void Application::send(
     const std::optional<std::vector<FixResponseGroup>> &response_groups,
     const FIX::Message &msg, const std::string &msg_type) {
     try {
-        std::shared_ptr<FIX::Message> message =
-            std::make_shared<FIX::Message>();
+        auto message = std::make_shared<FIX::Message>();
         if (msg_type == "ExecutionReport") {
             message->getHeader().setField(FIX::MsgType("8"));
         } else if (msg_type == "OrderCancelReject") {
@@ -786,7 +762,8 @@ asio::awaitable<void> Application::startStress(std::vector<std::string> csv,
     std::vector<std::shared_ptr<FIX::Message>> report;
     bool flag = ("getTzDateTime" == create_time_func ? true : false);
     for (const auto &fix_fields : vec_fix_fields) {
-        auto exec_report = createExecutionReport();
+        auto exec_report = std::make_shared<FIX::Message>();
+        exec_report->getHeader().setField(FIX::MsgType("8"));
         if (flag) {
             exec_report->setField(FIX::FIELD::TransactTime, getTzDateTime());
         } else {
