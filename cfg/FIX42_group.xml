@@ -1,0 +1,290 @@
+<fix type='FIX' major='4' minor='2' servicepack='0'>
+  <header>
+    <field name='BeginString' required='Y'/>
+    <field name='BodyLength' required='Y'/>
+    <field name='MsgType' required='Y'/>
+    <field name='SenderCompID' required='Y'/>
+    <field name='TargetCompID' required='Y'/>
+    <field name='OnBehalfOfCompID' required='N'/>
+    <field name='DeliverToCompID' required='N'/>
+    <field name='MsgSeqNum' required='Y'/>
+    <field name='SenderSubID' required='N'/>
+    <field name='SenderLocationID' required='N'/>
+    <field name='TargetSubID' required='N'/>
+    <field name='PossDupFlag' required='N'/>
+    <field name='PossResend' required='N'/>
+    <field name='SendingTime' required='Y'/>
+    <field name='OrigSendingTime' required='N'/>
+  </header>
+
+  <trailer>
+    <field name='CheckSum' required='Y'/>
+  </trailer>
+
+  <messages>
+    <message name='Logon' msgtype='A' msgcat='admin'>
+      <field name='EncryptMethod' required='Y'/>
+      <field name='HeartBtInt' required='Y'/>
+      <!-- Custom (from Spec) -->
+      <field name='UserID' required='N'/>
+      <field name='CurrentPassword' required='N'/>
+      <field name='ResetSeqNumFlag' required='N'/>
+    </message>
+    <message name='Heartbeat' msgtype='0' msgcat='admin'>
+      <field name='TestReqID' required='N'/>
+    </message>
+    <message name='TestRequest' msgtype='1' msgcat='admin'>
+      <field name='TestReqID' required='Y'/>
+    </message>
+    <message name='ResendRequest' msgtype='2' msgcat='admin'>
+      <field name='BeginSeqNo' required='Y'/>
+      <field name='EndSeqNo' required='Y'/>
+    </message>
+    <message name='Reject' msgtype='3' msgcat='admin'>
+      <field name='RefSeqNum' required='Y'/>
+      <field name='Text' required='N'/>
+    </message>
+    <message name='SequenceReset' msgtype='4' msgcat='admin'>
+      <field name='GapFillFlag' required='N'/>
+      <field name='NewSeqNo' required='Y'/>
+    </message>
+    <message name='Logout' msgtype='5' msgcat='admin'>
+      <field name='Text' required='N'/>
+    </message>
+    <message name='TradingSessionStatus' msgtype='h' msgcat='app'>
+      <field name='TradingSessionID' required='Y'/>
+      <field name='TradSesStatus' required='Y'/>
+      <field name='Text' required='N'/>
+    </message>
+    <message name='NewOrderSingle' msgtype='D' msgcat='app'>
+      <field name='ClOrdID' required='Y' />
+      <field name='Account' required='N' />
+      <field name='Symbol' required='Y' />
+      <field name='Side' required='Y' />
+      <field name='TransactTime' required='Y' />
+      <field name='OrdType' required='Y' />
+      <field name='OrderQty' required='N' />
+    </message>
+    <message name='OrderCancelReplaceRequest' msgtype='G' msgcat='app'>
+      <field name='ClOrdID' required='Y'/>
+      <field name='OrderID' required='N'/>
+      <field name='ClientID' required='N'/>
+      <field name='OrigClOrdID' required='Y'/>
+      <field name='Account' required='N'/>
+      <field name='HandlInst' required='Y'/>
+      <field name='Symbol' required='Y'/>
+      <field name='Side' required='Y'/>
+      <field name='TransactTime' required='Y'/>
+      <field name='OrderQty' required='N'/>
+      <field name='OrdType' required='Y'/>
+      <field name='Price' required='N'/>
+      <field name='SymbolSfx' required='N'/>
+      <field name='ComplianceID' required='N'/>
+      <!-- Custom (from Spec) -->
+      <field name='ClientCode' required='N'/>
+      <field name='AccountType' required='N'/>
+      <field name='AccountID' required='N'/>
+    </message>
+    <message name='OrderCancelRequest' msgtype='F' msgcat='app'>
+      <field name='ClOrdID' required='Y'/>
+      <field name='OrderID' required='N'/>
+      <field name='OrigClOrdID' required='N'/> <!-- Not set for now -->
+      <field name='ClientID' required='N'/>
+      <field name='Account' required='N'/>
+      <field name='Symbol' required='Y'/>
+      <field name='SymbolSfx' required='N'/>
+      <field name='Side' required='Y'/>
+      <field name='HandlInst' required='N'/>
+      <field name='TransactTime' required='Y'/>
+    </message>
+    <message name='ExecutionReport' msgtype='8' msgcat='app'>
+      <field name='OrderID' required='Y' />
+      <field name='ExecID' required='Y' />
+      <field name='ExecTransType' required='Y' />
+      <field name='ExecType' required='Y' />
+      <field name='OrdStatus' required='Y' />
+      <field name='Symbol' required='Y' />
+      <field name='Side' required='Y' />
+      <field name='TransactTime' required='N' />
+      <group         name="NoExecReports"       required="Y" >  <!-- 22108 -->
+        <field         name="ClOrdID"                     required="Y" />
+        <field         name="Symbol"                      required="Y" />
+      </group>
+    </message>
+    <message name='OrderCancelReject' msgtype='9' msgcat='app'>
+      <field name='ClOrdID' required='Y'/>
+      <field name='OrderID' required='Y'/>
+      <field name='OrigClOrdID' required='N'/>
+      <field name='OrdStatus' required='Y'/>
+      <field name='CxlRejResponseTo' required='Y'/>
+      <field name='Text' required='N'/>
+    </message>
+    <message name='BusinessMessageReject' msgtype='j' msgcat='app'>
+      <field name='RefSeqNum' required='N'/>
+      <field name='RefMsgType' required='Y'/>
+      <field name='BusinessRejectRefID' required='N'/>
+      <field name='BusinessRejectReason' required='Y'/>
+      <field name='Text' required='N'/>
+      <field name='EncodedTextLen' required='N'/>
+      <field name='EncodedText' required='N'/>
+    </message>
+    <message name='LoginOK' msgtype='U9' msgcat='app'>
+      <field name='EncryptMethod' required='Y'/>
+      <field name='HeartBtInt' required='Y'/>
+      <field name='UserID' required='N'/>
+      <field name='ServerTime' required='N'/>
+    </message>
+  </messages>
+
+  <fields>
+    <field number='1' name='Account' type='STRING'/>
+    <field number='7' name='BeginSeqNo' type='INT'/>
+    <field number='8' name='BeginString' type='STRING'/>
+    <field number='9' name='BodyLength' type='INT'/>
+    <field number='10' name='CheckSum' type='STRING'/>
+    <field number='11' name='ClOrdID' type='STRING'/>
+    <field number='14' name='CumQty' type='QTY'/>
+    <field number='16' name='EndSeqNo' type='INT'/>
+    <field number='17' name='ExecID' type='STRING'/>
+    <field number='20' name='ExecTransType' type='CHAR'>
+      <value enum='0' description='NEW'/>
+      <value enum='1' description='CANCEL'/>
+      <value enum='2' description='CORRECT'/>
+      <value enum='3' description='STATUS'/>
+      <value enum='4' description='REJECTED'/>
+    </field>
+    <field number='21' name='HandlInst' type='CHAR'>
+      <value enum='1' description='AUTOMATED_EXECUTION_ORDER_PRIVATE_NO_BROKER_INTERVENTION'/>
+    </field>
+    <field number='31' name='LastPx' type='PRICE'/>
+    <field number='32' name='LastShares' type='QTY'/>
+    <field number='34' name='MsgSeqNum' type='INT'/>
+    <field number='35' name='MsgType' type='STRING'/>
+    <field number='36' name='NewSeqNo' type='INT'/>
+    <field number='37' name='OrderID' type='STRING'/>
+    <field number='38' name='OrderQty' type='QTY'/>
+    <field number='39' name='OrdStatus' type='STRING'>
+      <value enum='R0' description='REQUEST_ORDER'/>
+      <value enum='0' description='NEW'/>
+      <value enum='1' description='PARTIALLY_FILLED'/>
+      <value enum='2' description='FILLED'/>
+      <value enum='R4' description='REQUEST_CANCEL'/>
+      <value enum='4' description='CANCELED'/>
+      <value enum='R5' description='REQUEST_REPLACE'/>
+      <value enum='5' description='REPLACED'/>
+      <value enum='N5' description='REQUEST_NEW_FROM_REPLACE'/>
+      <value enum='8' description='REJECTED'/>
+    </field>
+    <field number='40' name='OrdType' type='CHAR'>
+      <value enum='1' description='MARKET'/>
+      <value enum='2' description='LIMIT'/>
+    </field>
+    <field number='41' name='OrigClOrdID' type='STRING'/>
+    <field number='43' name='PossDupFlag' type='BOOLEAN'>
+      <value enum='Y' description='POSSIBLE_DUPLICATE'/>
+      <value enum='N' description='ORIGINAL_TRANSMISSION'/>
+    </field>
+    <field number='44' name='Price' type='PRICE'/>
+    <field number='45' name='RefSeqNum' type='INT'/>
+    <field number='49' name='SenderCompID' type='STRING'/>
+    <field number='50' name='SenderSubID' type='STRING'/>
+    <field number='52' name='SendingTime' type='UTCTIMESTAMP'/>
+    <field number='54' name='Side' type='CHAR'>
+      <value enum='1' description='BUY'/>
+      <value enum='2' description='SELL'/>
+    </field>
+    <field number='55' name='Symbol' type='STRING'/>
+    <field number='56' name='TargetCompID' type='STRING'/>
+    <field number='57' name='TargetSubID' type='STRING'/>
+    <field number='58' name='Text' type='STRING'/>
+    <field number='60' name='TransactTime' type='UTCTIMESTAMP'/>
+    <field number='65' name='SymbolSfx' type='STRING'/>
+    <field number='97' name='PossResend' type='BOOLEAN'>
+      <value enum='Y' description='POSSIBLE_RESEND'/>
+      <value enum='N' description='ORIGINAL_TRANSMISSION'/>
+    </field>
+    <field number='98' name='EncryptMethod' type='INT'>
+      <value enum='0' description='NONE_OTHER'/>
+    </field>
+    <field number='108' name='HeartBtInt' type='INT'/>
+    <field number='109' name='ClientID' type='STRING'/>
+    <field number='112' name='TestReqID' type='STRING'/>
+    <field number='115' name='OnBehalfOfCompID' type='STRING'/>
+    <field number='122' name='OrigSendingTime' type='UTCTIMESTAMP'/>
+    <field number='123' name='GapFillFlag' type='BOOLEAN'>
+      <value enum='Y' description='GAP_FILL_MESSAGE_MSGSEQNUM_FIELD_VALID'/>
+      <value enum='N' description='SEQUENCE_RESET_IGNORE_MSGSEQNUM'/>
+    </field>
+    <field number='128' name='DeliverToCompID' type='STRING'/>
+    <field number='141' name='ResetSeqNumFlag' type='BOOLEAN'>
+      <value enum='Y' description='YES_RESET_SEQUENCE_NUMBERS'/>
+      <value enum='N' description='NO'/>
+    </field>
+    <field number='142' name='SenderLocationID' type='STRING'/>
+    <field number='150' name='ExecType' type='STRING'>
+      <value enum='R0' description='REQUEST_ORDER'/>
+      <value enum='0' description='NEW'/>
+      <value enum='1' description='PARTIAL_FILL'/>
+      <value enum='2' description='FILL'/>
+      <value enum='R4' description='REQUEST_CANCEL'/>
+      <value enum='4' description='CANCELED'/>
+      <value enum='R5' description='REQUEST_REPLACE'/>
+      <value enum='5' description='REPLACE'/>
+      <value enum='N5' description='REQUEST_NEW_FROM_REPLACE'/>
+      <value enum='8' description='REJECTED'/>
+    </field>
+    <field number='151' name='LeavesQty' type='QTY'/>
+    <field number='198' name='SecondaryOrderID' type='STRING'/>
+    <field number='336' name='TradingSessionID' type='STRING'/>
+    <field number='337' name='ContraTrader' type='STRING'/>
+    <field number='340' name='TradSesStatus' type='CHAR'>
+      <value enum='2' description='STANDBY'/>
+      <value enum='3' description='BEGIN_FIRST_SESSION'/>
+      <value enum='4' description='END_FIRST_SESSION'/>
+      <value enum='5' description='BEGIN_SECOND_SESSION'/>
+      <value enum='6' description='END_SECOND_SESSION'/>
+      <value enum='8' description='BEGIN_PRE_OPENING'/>
+      <value enum='9' description='END_PRE_OPENING'/>
+      <value enum='a' description='BEGIN_PRE_CLOSING'/>
+      <value enum='b' description='END_PRE_CLOSING'/>
+      <value enum='c' description='BEGIN_POST_TRADING'/>
+      <value enum='d' description='END_POST_TRADING'/>
+      <value enum='e' description='TRADING_SUSPENSION'/>
+      <value enum='f' description='TRADING_ACTIVATION'/>
+      <value enum='g' description='BOARD_SUSPENSION'/>
+      <value enum='h' description='BOARD_ACTIVATION'/>
+      <value enum='I' description='INSTRUMENT_SUSPENSION'/>
+      <value enum='j' description='INSTRUMENT_ACTIVATION'/>
+      <value enum='k' description='MARKET_SUSPENSION'/>
+      <value enum='l' description='MARKET_ACTIVATION'/>
+    </field>
+    <field number='354' name='EncodedTextLen' type='INT'/>
+    <field number='355' name='EncodedText' type='DATA'/>
+    <field number='372' name='RefMsgType' type='STRING'/>
+    <field number='375' name='ContraBroker' type='STRING'/>
+    <field number='376' name='ComplianceID' type='STRING'/>
+    <field number='379' name='BusinessRejectRefID' type='STRING'/>
+    <field number='380' name='BusinessRejectReason' type='INT'>
+      <value enum='0' description='OTHER'/>
+      <value enum='1' description='UNKOWN_ID'/>
+      <value enum='2' description='UNKNOWN_SECURITY'/>
+      <value enum='3' description='UNSUPPORTED_MESSAGE_TYPE'/>
+      <value enum='4' description='APPLICATION_NOT_AVAILABLE'/>
+      <value enum='5' description='CONDITIONALLY_REQUIRED_FIELD_MISSING'/>
+    </field>
+    <field number='434' name='CxlRejResponseTo' type='CHAR'>
+      <value enum='1' description='ORDER_CANCEL_REQUEST'/>
+      <value enum='2' description='ORDER_CANCEL_REPLACE_REQUEST'/>
+    </field>
+    <field number='10001' name='UserID' type='STRING'/>
+    <field number='10002' name='CurrentPassword' type='STRING'/>
+    <field number='10002' name='NewPassword' type='STRING'/>
+    <field number='10004' name='ServerTime' type='STRING'/>
+    <field number='10006' name='AccountID' type='STRING'/>
+    <field number='10007' name='ExchangeCode' type='STRING'/>
+    <field number='10061' name='AccountType' type='STRING'/>
+    <field number='10095' name='ClientCode' type='STRING'/>
+    <field number='10159' name='TradeSeqNo' type='INT'/>
+    <field number="22068"  name="NoExecReports"               type="NUMINGROUP" />
+  </fields>
+</fix>
