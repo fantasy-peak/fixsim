@@ -1,0 +1,92 @@
+#ifndef _CONFIG_H_
+#define _CONFIG_H_
+
+#include <yaml_cpp_struct.hpp>
+
+using FixFieldMap = std::unordered_map<int32_t, std::string>;
+
+enum class FixVersion : uint8_t {
+    FIX40,
+    FIX41,
+    FIX42,
+    FIX43,
+    FIX44,
+    FIX50,
+};
+YCS_ADD_ENUM(FixVersion, FIX40, FIX41, FIX42, FIX43, FIX44, FIX50)
+
+struct TradingSessionStatus {
+    FixFieldMap reply;
+    int32_t interval;
+};
+YCS_ADD_STRUCT(TradingSessionStatus, reply, interval)
+
+struct FixResponseGroup {
+    int32_t response_group_tag;
+    int32_t total_no;
+    std::vector<std::tuple<int32_t, std::string>> message_order;
+};
+YCS_ADD_STRUCT(FixResponseGroup, response_group_tag, total_no, message_order)
+
+struct ReplyData {
+    FixFieldMap reply;
+    int32_t interval;
+    std::string msg_type;
+    std::optional<std::vector<FixResponseGroup>> response_groups;
+};
+YCS_ADD_STRUCT(ReplyData, reply, interval, msg_type, response_groups)
+
+struct SymbolsReplyData {
+    FixFieldMap common_fields;
+    std::vector<std::string> symbols;
+    std::vector<ReplyData> reply_flow;
+};
+YCS_ADD_STRUCT(SymbolsReplyData, common_fields, symbols, reply_flow)
+
+struct DefaultReplyData {
+    FixFieldMap common_fields;
+    std::vector<ReplyData> reply_flow;
+};
+YCS_ADD_STRUCT(DefaultReplyData, common_fields, reply_flow)
+
+struct Reply {
+    FixFieldMap check_condition_header;
+    FixFieldMap check_condition_body;
+    FixFieldMap check_cl_order_id;
+    DefaultReplyData default_reply_flow;
+    std::vector<SymbolsReplyData> symbols_reply_flow;
+};
+YCS_ADD_STRUCT(Reply, check_condition_header, check_condition_body,
+               check_cl_order_id, default_reply_flow, symbols_reply_flow)
+
+struct LogonResponse {
+    std::string msgtype;
+    FixFieldMap reply;
+};
+YCS_ADD_STRUCT(LogonResponse, msgtype, reply)
+
+struct PushJob {
+    std::string task_id;
+    int max_push_limit;
+    ReplyData payload;
+};
+YCS_ADD_STRUCT(PushJob, task_id, max_push_limit, payload)
+
+struct Config {
+    FixVersion fix_version;
+    std::string http_server_host;
+    uint16_t http_server_port;
+    int32_t interval;
+    std::string fix_ini;
+    std::chrono::microseconds stress_interval;
+    std::vector<TradingSessionStatus> trading_session_status;
+    std::optional<LogonResponse> logon_response;
+    std::optional<FixFieldMap> header;
+    std::vector<Reply> custom_reply;
+    std::optional<std::vector<PushJob>> push_jobs;
+};
+YCS_ADD_STRUCT(Config, fix_version, http_server_host, http_server_port,
+               interval, fix_ini, stress_interval, trading_session_status,
+               logon_response, header, custom_reply, push_jobs)
+
+#endif  // _CONFIG_H_
