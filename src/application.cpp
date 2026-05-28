@@ -15,19 +15,6 @@
 #include <quickfix/FixFieldNumbers.h>
 #include <quickfix/Message.h>
 #include <quickfix/Session.h>
-#include <quickfix/fix40/ExecutionReport.h>
-#include <quickfix/fix41/ExecutionReport.h>
-#include <quickfix/fix42/ExecutionReport.h>
-#include <quickfix/fix43/ExecutionReport.h>
-#include <quickfix/fix44/ExecutionReport.h>
-#include <quickfix/fix50/ExecutionReport.h>
-
-#include <quickfix/fix40/OrderCancelReject.h>
-#include <quickfix/fix41/OrderCancelReject.h>
-#include <quickfix/fix42/OrderCancelReject.h>
-#include <quickfix/fix43/OrderCancelReject.h>
-#include <quickfix/fix44/OrderCancelReject.h>
-#include <quickfix/fix50/OrderCancelReject.h>
 
 #include <quickfix/fix42/TradingSessionStatus.h>
 #include <quickfix/fix43/TradingSessionStatus.h>
@@ -258,7 +245,7 @@ asio::awaitable<void> Application::sendCustomizeLoginResponse(
     message->getHeader().setField(
         FIX::MsgType(m_cfg.logon_response.value().msgtype));
     for (auto &[id, value] : m_cfg.logon_response.value().reply) {
-        fillExecReport(message, msg, id, value);
+        toFillResponse(message, msg, id, value);
     }
     FIX::Session::sendToTarget(*message, id);
     co_return;
@@ -443,7 +430,7 @@ void Application::addGroup(std::shared_ptr<FIX::Message> &message,
     }
 }
 
-void Application::fillExecReport(std::shared_ptr<FIX::Message> &message,
+void Application::toFillResponse(std::shared_ptr<FIX::Message> &message,
                                  const FIX::Message &msg, int field,
                                  const std::string &value) {
     fill(this, message, msg, field, value);
@@ -464,10 +451,10 @@ void Application::send(
             message->getHeader().setField(FIX::MsgType(msg_type));
         }
         for (const auto &[field, value] : common_fix_fields) {
-            fillExecReport(message, msg, field, value);
+            toFillResponse(message, msg, field, value);
         }
         for (const auto &[field, value] : fix_fields) {
-            fillExecReport(message, msg, field, value);
+            toFillResponse(message, msg, field, value);
         }
         if (response_groups.has_value()) {
             for (const auto &fix_response_group : response_groups.value()) {

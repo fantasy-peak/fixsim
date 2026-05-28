@@ -60,7 +60,7 @@ private:
     asio::awaitable<void> startPushJob(
         FIX::SessionID id, PushJob push_job,
         std::shared_ptr<asio::steady_timer> timer);
-    void fillExecReport(std::shared_ptr<FIX::Message> &, const FIX::Message &,
+    void toFillResponse(std::shared_ptr<FIX::Message> &, const FIX::Message &,
                         int, const std::string &);
     asio::awaitable<void> sendCustomizeLoginResponse(FIX::Message,
                                                      FIX::SessionID);
