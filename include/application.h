@@ -45,6 +45,7 @@ public:
     void stopHttpServer();
 
     std::string createUniqueOrderID(const FIX::Message &);
+    int findTag(const std::string &);
 
 private:
     void addTimedTask(const FIX::SessionID &, std::vector<ReplyData> &,
@@ -61,7 +62,7 @@ private:
         FIX::SessionID id, PushJob push_job,
         std::shared_ptr<asio::steady_timer> timer);
     void toFillResponse(std::shared_ptr<FIX::Message> &, const FIX::Message &,
-                        int, const std::string &);
+                        const std::string &, const std::string &);
     asio::awaitable<void> sendCustomizeLoginResponse(FIX::Message,
                                                      FIX::SessionID);
     void addGroup(std::shared_ptr<FIX::Message> &message,
@@ -99,6 +100,7 @@ private:
         std::tuple<std::chrono::system_clock::time_point, std::string>>
         m_ClOrdID_OrderID_mapping;
     std::set<std::string> m_order_ids;
+    std::unordered_map<std::string, int> m_fix_field_numbers;
 };
 
 #endif

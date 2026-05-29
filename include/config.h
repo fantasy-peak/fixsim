@@ -3,7 +3,7 @@
 
 #include <yaml_cpp_struct.hpp>
 
-using FixFieldMap = std::unordered_map<int32_t, std::string>;
+using FixFieldMap = std::unordered_map<std::string, std::string>;
 
 enum class FixVersion : uint8_t {
     FIX40,
@@ -24,7 +24,7 @@ YCS_ADD_STRUCT(TradingSessionStatus, reply, interval)
 struct FixResponseGroup {
     int32_t response_group_tag;
     int32_t total_no;
-    std::vector<std::tuple<int32_t, std::string>> message_order;
+    std::vector<std::tuple<std::string, std::string>> message_order;
 };
 YCS_ADD_STRUCT(FixResponseGroup, response_group_tag, total_no, message_order)
 

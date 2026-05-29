@@ -115,6 +115,32 @@ std::string increment() {
 }
 
 template <typename T>
+T to_integral(std::string_view str, int base = 10) {
+    static_assert(std::is_integral_v<T>, "T must be an integral type.");
+
+    T value{};
+    auto [ptr, ec] =
+        std::from_chars(str.data(), str.data() + str.size(), value, base);
+
+    if (ec == std::errc::result_out_of_range) {
+        throw std::out_of_range("to_integral: value out of range");
+    }
+
+    if (ec != std::errc() || ptr != str.data() + str.size()) {
+        throw std::invalid_argument("to_integral: invalid argument");
+    }
+
+    return value;
+}
+
+bool is_numeric(std::string_view str) {
+    if (str.empty())
+        return false;
+    return std::all_of(str.begin(), str.end(),
+                       [](unsigned char c) { return std::isdigit(c); });
+}
+
+template <typename T>
 void setField(T &message, int tag, const std::string &value) {
     if (value == "bool:true" || value == "bool:false") {
         FIX::BoolField field(tag, value == "bool:true" ? true : false);
@@ -128,19 +154,19 @@ void fill(auto self, auto &message, const FIX::Message &msg, int field,
           const std::string &value) {
     if (value.starts_with("input.")) {
         auto val = getValue(value);
-        setField(*message, field, msg.getField(std::stoi(val)));
+        setField(*message, field, msg.getField(self->findTag(val)));
     } else if (value.starts_with("if_input.")) {
         auto val = getValue(value);
-        auto field = std::stoi(val);
+        auto field = self->findTag(val);
         if (msg.isSetField(field)) {
             setField(*message, field, msg.getField(field));
         }
     } else if (value.starts_with("input_header.")) {
         auto val = getValue(value);
-        setField(*message, field, msg.getHeader().getField(std::stoi(val)));
+        setField(*message, field, msg.getHeader().getField(self->findTag(val)));
     } else if (value.starts_with("if_input_header.")) {
         auto val = getValue(value);
-        auto field = std::stoi(val);
+        auto field = self->findTag(val);
         if (msg.getHeader().isSetField(field)) {
             setField(*message, field, msg.getHeader().getField(field));
         }
@@ -230,12 +256,25 @@ void Application::toApp(FIX::Message &message, const FIX::SessionID &) {
         return;
     for (auto &[tag, value] : m_cfg.header.value()) {
         if (value.starts_with("bool:")) {
-            FIX::BoolField field(tag, value == "bool:true" ? true : false);
+            FIX::BoolField field(findTag(tag),
+                                 value == "bool:true" ? true : false);
             message.getHeader().setField(field);
         } else {
-            message.getHeader().setField(tag, value);
+            message.getHeader().setField(findTag(tag), value);
         }
     }
+}
+
+int Application::findTag(const std::string &field) {
+    if (is_numeric(field)) {
+        return to_integral<int>(field);
+    }
+    auto it = m_fix_field_numbers.find(field);
+    if (it == m_fix_field_numbers.end()) {
+        SPDLOG_ERROR("Failed to find FIX tag for field: '{}'", field);
+        throw std::runtime_error("Failed to find FIX tag");
+    }
+    return it->second;
 }
 
 asio::awaitable<void> Application::sendCustomizeLoginResponse(
@@ -286,7 +325,7 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
             bool header_match =
                 std::ranges::all_of(check_cond_header, [&](const auto &cond) {
                     const auto &[field, expected] = cond;
-                    auto value = hdr.getField(field);
+                    auto value = hdr.getField(findTag(field));
                     if (expected == "optional(none)") {
                         return true;
                     }
@@ -299,7 +338,7 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
             bool body_match =
                 std::ranges::all_of(check_cond_body, [&](const auto &cond) {
                     const auto &[field, expected] = cond;
-                    auto value = body.getField(field);
+                    auto value = body.getField(findTag(field));
                     if (expected == "optional(none)") {
                         return true;
                     }
@@ -405,7 +444,7 @@ void Application::addGroup(std::shared_ptr<FIX::Message> &message,
     std::vector<int32_t> fields;
     fields.reserve(message_order.size());
     for (auto &[field, value] : message_order) {
-        fields.emplace_back(field);
+        fields.emplace_back(findTag(field));
     }
     if (fields.empty()) {
         SPDLOG_ERROR("group fields enpty!!!");
@@ -424,16 +463,17 @@ void Application::addGroup(std::shared_ptr<FIX::Message> &message,
         FIX::Group rsp_group(rsp_group_tag, rsp_first_field, rsp_field_order);
         for (auto &[field, value] : message_order) {
             auto ptr = &rsp_group;
-            fill(this, ptr, msg, field, value);
+            fill(this, ptr, msg, findTag(field), value);
         }
         message->addGroup(rsp_group);
     }
 }
 
 void Application::toFillResponse(std::shared_ptr<FIX::Message> &message,
-                                 const FIX::Message &msg, int field,
+                                 const FIX::Message &msg,
+                                 const std::string &field,
                                  const std::string &value) {
-    fill(this, message, msg, field, value);
+    fill(this, message, msg, findTag(field), value);
 }
 
 void Application::send(
@@ -472,7 +512,7 @@ asio::awaitable<void> Application::sendTss(FIX::SessionID id) {
     for (auto &[reply, interval] : m_cfg.trading_session_status) {
         auto message = createTradingSessionStatus();
         for (auto &[tag, value] : reply) {
-            setField(*message, tag, value);
+            setField(*message, findTag(tag), value);
         }
         if (interval < 0) {
             FIX::Session::sendToTarget(*message, id);
@@ -565,6 +605,7 @@ void Application::parseXml(const std::string &xml) {
     for (pugi::xml_node field : fields.children("field")) {
         std::string name = field.attribute("name").as_string();
         int number = field.attribute("number").as_int();
+        m_fix_field_numbers[name] = number;
         std::string type = field.attribute("type").as_string();
         nlohmann::json json;
         if (type == "CHAR" || type == "BOOLEAN") {
