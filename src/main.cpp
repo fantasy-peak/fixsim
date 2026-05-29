@@ -277,6 +277,7 @@ int main(int argc, char **argv) {
         acceptor->start();
 
         application.startHttpServer();
+        application.isFixFieldConfigValid();
 
         sig.async_wait([&](const asio::error_code &, int) {
             SPDLOG_INFO("stop...");

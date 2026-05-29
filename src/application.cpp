@@ -192,6 +192,58 @@ void fill(auto self, auto &message, const FIX::Message &msg, int field,
     }
 }
 
+struct MapVisitor {
+    void operator()(const FixFieldMap &field_map,
+                    const std::string &ctx) const {
+        if (field_map.empty())
+            return;
+#if 0
+        std::cout << "\n[Map] " << ctx << " (" << field_map.size()
+                  << " elements):\n";
+#endif
+        for (const auto &[key, value] : field_map) {
+#if 0
+            std::cout << "  |- " << key << " = " << value << "\n";
+#endif
+            app->findTag(key);
+            if (value.starts_with("input.") || value.starts_with("if_input.") ||
+                value.starts_with("input_header.")) {
+                auto val = getValue(value);
+                app->findTag(val);
+            }
+        }
+    }
+
+    template <typename T>
+    void operator()(const std::vector<T> &vec, const std::string &ctx) const {
+        for (size_t i = 0; i < vec.size(); ++i) {
+            (*this)(vec[i], ctx + "[" + std::to_string(i) + "]");
+        }
+    }
+
+    template <typename T>
+    void operator()(const std::optional<T> &opt, const std::string &ctx) const {
+        if (opt.has_value()) {
+            (*this)(*opt, ctx);
+        }
+    }
+
+    template <typename T>
+    auto operator()(const T &obj, const std::string &ctx) const
+        -> std::enable_if_t<visit_struct::traits::is_visitable<T>::value> {
+        visit_struct::for_each(obj,
+                               [&](const char *field_name, const auto &value) {
+                                   (*this)(value, ctx + "::" + field_name);
+                               });
+    }
+
+    template <typename T>
+    auto operator()(const T &, const std::string &) const
+        -> std::enable_if_t<!visit_struct::traits::is_visitable<T>::value> {}
+
+    Application *app;
+};
+
 }  // namespace
 
 Application::Application(std::shared_ptr<asio::io_context> ctx,
@@ -200,6 +252,8 @@ Application::Application(std::shared_ptr<asio::io_context> ctx,
     asio::co_spawn(*m_io_ctx, loopTimer(), asio::detached);
     asio::co_spawn(*m_io_ctx, clear(), asio::detached);
 }
+
+void Application::isFixFieldConfigValid() { MapVisitor{this}(m_cfg, "Config"); }
 
 void Application::onCreate(const FIX::SessionID &id) {
     SPDLOG_INFO("onCreate: [{}]", id.toString());

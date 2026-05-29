@@ -44,6 +44,7 @@ public:
     void startHttpServer();
     void stopHttpServer();
 
+    void isFixFieldConfigValid();
     std::string createUniqueOrderID(const FIX::Message &);
     int findTag(const std::string &);
 
