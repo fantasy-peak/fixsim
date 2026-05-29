@@ -69,13 +69,13 @@ custom_reply:
           - interval: -1
             msg_type: "ExecutionReport"
             reply:
-              39: "8" # accept
+              39: "0" # accept
               20: "0"
               150: "0" # ExecType
           - interval: 5000
             msg_type: "ExecutionReport"
             reply:
-              39: "9" # fill
+              39: "2" # fill
               20: "1"
               150: "2" # ExecType
               55: "TEST-USDJPY" # This will override the common fields settings
