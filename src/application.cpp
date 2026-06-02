@@ -93,6 +93,29 @@ std::string getTzDateTimeNoMs(std::string_view fmt = "{:%Y%m%d-%H:%M:%S}") {
     return std::vformat(fmt, std::make_format_args(zt));
 }
 
+auto parseRandomNumber(const std::string &input) {
+    struct ParseResult {
+        bool is_matched = false;
+        bool has_args = false;
+        int64_t x = 0;
+        int64_t y = 0;
+    };
+    ParseResult result;
+    std::regex pattern(
+        R"(^randomNumber(?:\(\s*(?:(-?\d+)\s*,\s*(-?\d+))?\s*\))?$)");
+    std::smatch matches;
+    if (std::regex_match(input, matches, pattern)) {
+        result.is_matched = true;
+        if (matches[1].matched && matches[2].matched) {
+            result.has_args = true;
+            result.x = std::stol(matches[1].str());
+            result.y = std::stol(matches[2].str());
+        }
+    }
+
+    return result;
+}
+
 std::string uuid() {
     uuid_t uuid;
     char uuid_str[37]{};
@@ -103,9 +126,9 @@ std::string uuid() {
     return value;
 }
 
-std::string randomNumber(int min = 1000, int max = 9999) {
+std::string randomNumber(int64_t min = 1000, int64_t max = 9999) {
     thread_local std::mt19937 gen(std::random_device{}());
-    std::uniform_int_distribution<> dist(min, max);
+    std::uniform_int_distribution<int64_t> dist(min, max);
     return std::to_string(dist(gen));
 }
 
@@ -172,12 +195,23 @@ void fill(auto self, auto &message, const FIX::Message &msg, int field,
         }
     } else if (value.starts_with("call.")) {
         auto func_name = getValue(value);
+        if (func_name.starts_with("randomNumber")) {
+            auto result = parseRandomNumber(func_name);
+            if (!result.is_matched) {
+                SPDLOG_ERROR("invalid: {}", value);
+                return;
+            }
+            if (result.has_args) {
+                setField(*message, field, randomNumber(result.x, result.y));
+            } else {
+                setField(*message, field, randomNumber());
+            }
+            return;
+        }
         if (func_name == "uuid") {
             setField(*message, field, uuid());
         } else if (func_name == "getTzDateTime") {
             setField(*message, field, getTzDateTime());
-        } else if (func_name == "randomNumber") {
-            setField(*message, field, randomNumber());
         } else if (func_name == "increment") {
             setField(*message, field, increment());
         } else if (func_name == "createUniqueOrderID") {
