@@ -380,9 +380,9 @@ asio::awaitable<void> Application::sendCustomizeLoginResponse(
 
 void Application::fromAdmin(const FIX::Message &msg, const FIX::SessionID &id) {
     try {
-        FIX::MsgType msgType;
-        msg.getHeader().getField(msgType);
-        if (msgType == FIX::MsgType_Logon && m_cfg.logon_response.has_value()) {
+        std::string msg_type = msg.getHeader().getField(FIX::FIELD::MsgType);
+        if (msg_type == FIX::MsgType_Logon &&
+            m_cfg.logon_response.has_value()) {
             asio::co_spawn(*m_io_ctx, sendCustomizeLoginResponse(msg, id),
                            [](std::exception_ptr ep) {
                                if (ep) {
@@ -413,7 +413,7 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
             bool header_match =
                 std::ranges::all_of(check_cond_header, [&](const auto &cond) {
                     const auto &[field, expected] = cond;
-                    auto value = hdr.getField(findTag(field));
+                    const auto &value = hdr.getField(findTag(field));
                     if (expected == "optional(none)") {
                         return true;
                     }
@@ -426,7 +426,7 @@ void Application::fromApp(const FIX::Message &msg, const FIX::SessionID &id) {
             bool body_match =
                 std::ranges::all_of(check_cond_body, [&](const auto &cond) {
                     const auto &[field, expected] = cond;
-                    auto value = body.getField(findTag(field));
+                    const auto &value = body.getField(findTag(field));
                     if (expected == "optional(none)") {
                         return true;
                     }
@@ -543,8 +543,8 @@ void Application::addGroup(std::shared_ptr<FIX::Message> &message,
     }
     auto rsp_first_field = fields[0];
     FIX::message_order rsp_field_order{fields.data(), fields.size()};
-    if (total_no <= 0) {
-        total_no = 1;
+    if (total_no < 0) {
+        total_no = 0;
     }
     message->setField(FIX::IntField(rsp_group_tag, total_no));
     for (int i = 0; i < total_no; ++i) {
